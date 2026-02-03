@@ -1,169 +1,176 @@
-# Backend Handoff Documentation - United Fillings Compliance Platform
-
-**Role:** Backend Engineer (Intern)
-**Objective:** Build the REST API and Database schema to power the United Fillings frontend.
-**Frontend Stack:** Next.js 14 (App Router), TypeScript, React Context, TanStack Query.
-
----
-
-## 1. System Overview
-
-The application is a Corporate Compliance & Legal Services dashboard with a Super Admin backend for management.
-
-**Key Concepts:**
-*   **Multi-Tenancy:** A User (e.g., Business Owner) can have access to multiple `Companies`.
-*   **Global Context:** The user selects a `Company` from the top header. *All* dashboard data (compliances, files, risks) changes based on this selection.
-*   **Role-Based Access Control (RBAC):**
-    *   `SUPER_ADMIN`: 
-        *   Can view "Global Dashboard" (Platform Aggregates).
-        *   Can manage **Admins** (Create, Revoke Access, View Utilization).
-        *   Can manage **Clients** (Create, Edit, Assign to Admins).
-        *   Can view all files uploaded by Admins and Clients.
-    *   `ADMIN`: 
-        *   Can see their assigned Client List (Context: "My Clients").
-        *   Can upload documents for clients.
-        *   Can view Task/Compliance status for their clients.
-    *   `USER`: 
-        *   Can view their company dashboards.
-        *   Can buy services and sign documents.
-        *   **Cannot** upload documents (unless specifically requested in a flow).
+# Backend Architecture & API Specification
+**Project:** United Fillings Compliance Platform
+**Version:** 1.0
+**Date:** February 3, 2026
 
 ---
 
-## 2. Authentication & Users
+## 1. Executive Summary
 
-Currently, the frontend uses a mock `AuthContext` (`src/context/auth-context.tsx`).
+This document serves as the technical handbook for the backend implementation of the United Fillings platform. The system is designed as a centralized compliance management dashboard that connects Business Owners (Users) with Compliance Experts (Admins), overseen by a Super Admin.
 
-**Requirement:**
-*   Implement JWT-based authentication.
-*   **Endpoints:**
-    *   `POST /api/auth/login`: Returns `{ token, user, role }`.
-    *   `GET /api/auth/me`: Validates session.
-
-**User Roles:**
-*   `SUPER_ADMIN`: The top-level manager.
-*   `ADMIN`: Staff members who manage clients.
-*   `USER`: The end client (Business Owner).
+The backend will be built using the **MERN Stack** (MongoDB, Express.js, React, Node.js) to ensure scalability and maintain consistency with the JavaScript-based frontend.
 
 ---
 
-## 3. Data Models & API Contract
+## 2. Technology Stack
 
-The frontend strictly follows the interfaces defined in `src/types/index.ts` and `src/context/super-admin-context.tsx`. **Your API responses must match these structures.**
+The following core technologies have been selected for the implementation:
 
-### A. Super Admin & Admin Management
-The `SuperAdminContext` manages this state globally for the Super Admin view.
-
-**Endpoints:**
-*   `GET /api/admins`: List all admins with their statistics.
-*   `POST /api/admins`: Create a new admin.
-*   `PATCH /api/admins/:id/status`: Revoke/Grant access (Status: ACTIVE/INACTIVE).
-*   `GET /api/clients`: List all clients (with Admin assignment info).
-*   `POST /api/clients`: Create a new client (Name, Company, Email, Phone).
-*   `PUT /api/clients/:id`: Update client details.
-*   `POST /api/clients/:id/assign`: Assign a client to an admin. Payload: `{ adminId: string | null }`.
-
-**Models:**
-
-**Admin Model:**
-```typescript
-interface Admin {
-    id: string
-    name: string
-    email: string
-    status: "ACTIVE" | "INACTIVE"
-    clientsAssigned: number
-    maxClients: number // Default 10
-}
-```
-
-**Client Model:**
-```typescript
-interface Client {
-    id: string
-    name: string
-    companyName: string
-    email?: string 
-    phone?: string 
-    status: "ACTIVE" | "INACTIVE"
-    assignedAdminId: string | null
-    pendingWork: number
-    completedWork: number
-    joinedDate?: string
-}
-```
-
-### B. Companies (Global Switcher)
-The frontend mock is in `src/context/company-context.tsx`.
-
-**Endpoint:** `GET /api/users/me/companies`
-**Response:** `Company[]`
-```typescript
-interface Company {
-  id: string;
-  name: string;
-  role: string; // e.g., 'Owner', 'Admin', 'Viewer' - context of the user in this company
-}
-```
-
-### C. Compliances (Dashboard Table)
-Used in the main Dashboard and Compliance Page.
-
-**Endpoint:** `GET /api/companies/:companyId/compliances`
-**Query Params:** Support filtering by `status` (PENDING, DELAYED, etc.).
-**Response:** `ComplianceRecord[]`
-
-```typescript
-type ComplianceStatus = 'PENDING' | 'DELAYED' | 'COMPLETED' | 'FILING_DONE';
-type ComplianceStage = 'PAYMENT' | 'DOCUMENTATION' | 'GOVT_APPROVAL' | 'FILING_DONE';
-
-interface ComplianceRecord {
-  id: string;
-  companyName: string;
-  serviceType: string;  // e.g. "Annual Filing"
-  expertName: string;   // Assigned internal expert
-  dueDate: string;      // ISO Date String
-  stage: ComplianceStage;
-  status: ComplianceStatus;
-}
-```
-
-### D. Documents (Shared File System)
-Used in `/documents`. This is now a shared space between Admins and Super Admins.
-
-**Concept:**
-*   **Admins** upload files to a "Shared" space.
-*   **Super Admins** can see all files.
-*   **Clients** can see files relevant to them.
-
-**Endpoint:** `GET /api/documents`
-**Response:** List of documents with metadata.
-
-```typescript
-interface Document {
-  id: string
-  name: string
-  date: string // Upload date
-  uploader: string // Name of uploader (Admin/User)
-  folder: string // 'united', 'legal', etc.
-  url: string // Storage URL
-}
-```
-
-**Upload Endpoint:**
-*   `POST /api/documents/upload`
-*   **Payload:** Multipart form data (file) + Metadata (Folder, SharedWith).
-*   *Note:* Frontend simulates persistence using `localStorage` ("shared_docs"). Backend must implement real storage (S3/GCS).
+*   **Runtime Environment:** Node.js (LTS Version)
+*   **Web Framework:** Express.js
+*   **Database:** MongoDB (via MongoDB Atlas)
+*   **ODM:** Mongoose
+*   **Authentication:** JSON Web Tokens (JWT) with bcrypt encryption
+*   **File Storage:** Cloudflare R2 (S3-Compatible Object Storage)
 
 ---
 
-## 4. Frontend Integration Points
-*   **API Client**: All mock calls are currently centralized in `src/lib/api.ts`.
-*   **Contexts**: 
-    *   `SuperAdminContext`: Handles Client/Admin global state.
-    *   `CompanyContext`: Handles active company selection.
-    *   `AuthContext`: Handles user session.
+## 3. User Roles & Permissions (RBAC)
 
-## 5. Deployment & Environment
-*   Create a `.env` file for API base URLs.
-*   Ensure CORS is configured to allow requests from the frontend domain.
+The system enforces strict Role-Based Access Control. Using middleware, the API must validate the role of the requesting user before processing sensitive actions.
+
+### Super Admin (Global Scope)
+The highest level of privilege, intended for the platform owners.
+*   **Access Level:** Global (All Data)
+*   **Key Capabilities:**
+    *   Create and manage internal Admin accounts.
+    *   View and edit all Client and Company data.
+    *   Assign Clients to specific Admins for management.
+    *   Access global revenue and performance analytics.
+
+### Admin (Restricted Scope)
+Intended for internal staff or compliance experts and operational managers.
+*   **Access Level:** Assigned Clients Only
+*   **Key Capabilities:**
+    *   View detailed compliance status for assigned clients.
+    *   Upload tax filings and legal documents on behalf of the client.
+    *   Update the status of compliance tasks (e.g., changing status from "Pending" to "Completed").
+
+### User (Private Scope)
+Intended for the end-clients (Business Owners).
+*   **Access Level:** Personal Data Only
+*   **Key Capabilities:**
+    *   View the dashboard for their own companies.
+    *   Book consultations with experts.
+    *   Download reports and view uploaded documents.
+    *   **Restriction:** Users cannot view internal notes or other clients' data.
+
+---
+
+## 4. Database Schema Design
+
+The database will be structured using Mongoose schemas. Below are the definitions for the core entities.
+
+### 4.1 Users & Authentication
+Stores login credentials and system roles.
+```javascript
+const UserSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true }, // Encrypted string
+  role: { type: String, enum: ['SUPER_ADMIN', 'ADMIN', 'USER'], default: 'USER' },
+  
+  // For Admins only: References to clients they are responsible for
+  managedClients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Client' }],
+  createdAt: { type: Date, default: Date.now }
+});
+```
+
+### 4.2 Clients (Super Admin Context)
+Represents the human point of contact or the account holder.
+```javascript
+const ClientSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  companyName: { type: String, required: true }, // Display name
+  email: { type: String, unique: true },
+  phone: String,
+  status: { type: String, enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' },
+  
+  // The Admin responsible for this client
+  assignedAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  
+  // Metrics for dashboard
+  pendingWork: { type: Number, default: 0 },
+  completedWork: { type: Number, default: 0 },
+  
+  // Link to actual business entities
+  companies: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Company' }],
+  joinedDate: { type: Date, default: Date.now }
+});
+```
+
+### 4.3 Consultations (Booking System)
+Manages the flow of booking appointments with experts.
+```javascript
+const ConsultationSchema = new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  type: { type: String, enum: ['CA', 'LAWYER'], required: true },
+  
+  // Operational Details
+  ticketNumber: { type: String, required: true, unique: true },
+  status: { type: String, enum: ['PAYMENT_PENDING', 'SCHEDULED', 'COMPLETED'], default: 'PAYMENT_PENDING' },
+  
+  // Scheduling
+  scheduledSlot: {
+    date: Date,
+    time: String
+  },
+  
+  // Communication Log
+  messages: [{
+    sender: { type: String, enum: ['User', 'Expert'] },
+    content: String,
+    timestamp: { type: Date, default: Date.now }
+  }]
+});
+```
+
+### 4.4 Documents
+Stores metadata for files uploaded to Cloudflare R2.
+```javascript
+const DocumentSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  url: { type: String, required: true }, // Public URL from Cloudflare
+  folder: { type: String, default: 'General' },
+  
+  uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  company: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
+  createdAt: { type: Date, default: Date.now }
+});
+```
+
+---
+
+## 5. API Specification & Endpoints
+
+### Authentication
+*   `POST /api/auth/login`: Authenticates user and returns a JWT.
+*   `GET /api/auth/me`: Validates the session and returns user profile.
+
+### Consultation Module
+*   `POST /api/consultations/book`: Initiates a new booking. Sets status to 'PAYMENT_PENDING'.
+*   `POST /api/consultations/:id/verify-otp`: confirm booking validity. Updates status to 'SCHEDULED'.
+*   `GET /api/consultations`: Retrieves history for the logged-in user.
+*   `GET /api/consultations/:id`: Retrieves detailed timeline and messages.
+
+### Document Management
+*   `POST /api/documents/upload`: Accepts multipart form data. Uploads to storage provider and saves metadata.
+*   `GET /api/documents`: Lists documents filtered by folder or company.
+
+---
+
+## 6. Implementation Guidelines
+
+### File Upload Workflow
+To maintain performance and keep the database lean, we utilize Cloudflare R2 for file storage.
+1.  **Ingestion:** The API receives the file via `multer` middleware.
+2.  **Storage:** The backend uses the AWS SDK to stream the file to the R2 bucket.
+3.  **Reference:** Once uploaded, R2 provides a public URL (e.g., `https://files.unitedfillings.com/uploads/doc.pdf`).
+4.  ** Persistence:** This URL is stored in the MongoDB `Document` collection, not the file itself.
+
+### Development Phases
+1.  **Setup:** Initialize the Express project and connect to MongoDB Atlas.
+2.  **Auth Layer:** Implement User models and JWT middleware.
+3.  **Core Logic:** Build the Client and Compliance CRUD operations.
+4.  **Features:** Implement the Consultation booking flow and File Uploads.
