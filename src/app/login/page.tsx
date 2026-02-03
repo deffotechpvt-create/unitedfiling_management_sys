@@ -136,6 +136,10 @@ export default function LoginPage() {
                             <User className="mr-2 h-4 w-4" />
                             User Demo
                         </Button>
+                        <Button variant="outline" className="col-span-2" onClick={() => login("SUPER_ADMIN")}>
+                            <ShieldCheck className="mr-2 h-4 w-4" />
+                            Super Admin Demo
+                        </Button>
                     </div>
 
                     <div className="text-center text-sm text-slate-500 mt-4">
