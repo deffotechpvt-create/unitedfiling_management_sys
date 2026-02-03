@@ -62,7 +62,7 @@ export function Sidebar() {
             case "USER":
             default:
                 return [
-                    { name: "Home", href: "/", icon: LayoutDashboard },
+                    // { name: "Home", href: "/", icon: LayoutDashboard }, // User Dashboard removed
                     { name: "Compliances", href: "/compliances", icon: ShieldCheck },
                     { name: "Billing", href: "/billing", icon: ShoppingBag, badge: "COMING SOON" },
                     { name: "Service Hub", href: "/services", icon: ShoppingBag, star: true },
@@ -82,8 +82,8 @@ export function Sidebar() {
         <div className="flex h-full flex-col bg-[#001f3f] text-white"> {/* Updated to Dark Blue */}
             <div className="flex h-16 items-center px-6 pt-4 mb-4">
                 <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 bg-yellow-400 transform -skew-x-12" />
-                    <span className="text-xl font-bold tracking-tight text-white">zolvit <span className="bg-yellow-400 text-[#001f3f] text-[10px] px-1 rounded-sm ml-1 transform skew-x-0 inline-block font-extrabold">beta</span></span>
+                    <div className="h-8 w-8 bg-green-500 transform -skew-x-12" />
+                    <span className="text-xl font-bold tracking-tight text-white">United Fillings</span>
                 </div>
             </div>
 
@@ -98,14 +98,14 @@ export function Sidebar() {
                             className={cn(
                                 "group flex items-center px-3 py-3 text-sm font-medium transition-colors relative",
                                 isActive
-                                    ? "bg-white/10 text-white rounded-r-full border-l-4 border-yellow-400"
+                                    ? "bg-white/10 text-white rounded-r-full border-l-4 border-green-500"
                                     : "text-slate-300 hover:bg-white/5 hover:text-white"
                             )}
                         >
                             <item.icon
                                 className={cn(
                                     "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
-                                    isActive ? "text-yellow-400" : "text-slate-400 group-hover:text-white"
+                                    isActive ? "text-green-500" : "text-slate-400 group-hover:text-white"
                                 )}
                             />
                             {item.name}
