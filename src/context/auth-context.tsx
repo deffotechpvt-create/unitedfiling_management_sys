@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 
-export type UserRole = "ADMIN" | "USER"
+export type UserRole = "ADMIN" | "USER" | "SUPER_ADMIN"
 
 interface User {
     name: string
@@ -29,20 +29,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const storedRole = localStorage.getItem("united_fillings_role") as UserRole
         if (storedRole) {
+            let name = "John Doe";
+            let email = "user@unitedfillings.com";
+
+            if (storedRole === "ADMIN") {
+                name = "Admin User";
+                email = "admin@unitedfillings.com";
+            } else if (storedRole === "SUPER_ADMIN") {
+                name = "Super Admin";
+                email = "superadmin@unitedfillings.com";
+            }
+
             setUser({
-                name: storedRole === "ADMIN" ? "Admin User" : "John Doe",
+                name,
                 role: storedRole,
-                email: storedRole === "ADMIN" ? "admin@unitedfillings.com" : "user@unitedfillings.com"
+                email
             })
         }
     }, [])
 
     const login = (role: UserRole) => {
         localStorage.setItem("united_fillings_role", role)
+
+        let name = "John Doe";
+        let email = "user@unitedfillings.com";
+
+        if (role === "ADMIN") {
+            name = "Admin User";
+            email = "admin@unitedfillings.com";
+        } else if (role === "SUPER_ADMIN") {
+            name = "Super Admin";
+            email = "superadmin@unitedfillings.com";
+        }
+
         setUser({
-            name: role === "ADMIN" ? "Admin User" : "John Doe",
+            name,
             role: role,
-            email: role === "ADMIN" ? "admin@unitedfillings.com" : "user@unitedfillings.com"
+            email
         })
         router.push("/")
     }
