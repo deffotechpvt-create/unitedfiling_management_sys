@@ -1,3 +1,42 @@
+
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'USER';
+  status: 'ACTIVE' | 'INACTIVE';
+  avatarUrl?: string; // Added from your existing type
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+}
+export interface AuthResponse {
+  success: boolean;
+  user?: User;
+  message?: string;
+}
+
+export interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  error: string | null;
+  login: (credentials: LoginCredentials) => Promise<void>;
+  register: (data: RegisterData) => Promise<void>;
+  logout: () => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  isAuthenticated: boolean;
+}
 export type ComplianceStatus = 'PENDING' | 'DELAYED' | 'COMPLETED' | 'FILING_DONE';
 export type ComplianceStage = 'PAYMENT' | 'DOCUMENTATION' | 'GOVT_APPROVAL' | 'FILING_DONE';
 
@@ -16,13 +55,6 @@ export interface Company {
   name: string;
   role: string; // e.g., 'Owner'
 }
-
-export interface User {
-  name: string;
-  role: string;
-  avatarUrl?: string;
-}
-
 export interface Service {
   id: string;
   title: string;
