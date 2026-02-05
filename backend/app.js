@@ -40,17 +40,23 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // ======================
-// Rate Limiting
+// Rate Limiting (Disabled in Development)
 // ======================
-const limiter = rateLimit({
-  windowMs: constants.RATE_LIMIT.WINDOW_MS,
-  max: constants.RATE_LIMIT.MAX_REQUESTS,
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+if (process.env.NODE_ENV !== 'development') {
+  const limiter = rateLimit({
+    windowMs: constants.RATE_LIMIT.WINDOW_MS,
+    max: constants.RATE_LIMIT.MAX_REQUESTS,
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
 
-app.use('/api', limiter);
+  app.use('/api', limiter);
+  console.log('✅ Rate limiting enabled');
+} else {
+  console.log('⚠️  Rate limiting disabled (development mode)');
+}
+
 
 // ======================
 // Health Check

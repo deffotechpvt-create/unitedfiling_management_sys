@@ -507,12 +507,70 @@
       "name": "Phase 3 - Client Management",
       "item": [
         {
-          "name": "List Clients",
+          "name": "Get Client Statistics",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/clients?page=1&limit=10&status=ACTIVE",
+              "raw": "{{baseUrl}}/api/clients/stats/overview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "stats",
+                "overview"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Unassigned Clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/unassigned/list",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "unassigned",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List All Clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Clients (Filtered)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients?status=ACTIVE&search=client&assignedAdmin=unassigned",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -522,16 +580,19 @@
               ],
               "query": [
                 {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "10"
-                },
-                {
                   "key": "status",
-                  "value": "ACTIVE"
+                  "value": "ACTIVE",
+                  "description": "ACTIVE or INACTIVE"
+                },
+                {
+                  "key": "search",
+                  "value": "client",
+                  "description": "Search by name, company, email, phone"
+                },
+                {
+                  "key": "assignedAdmin",
+                  "value": "unassigned",
+                  "description": "Filter by admin ID or 'unassigned'"
                 }
               ]
             }
@@ -550,7 +611,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Client Name\",\n  \"companyName\": \"Client Company Ltd\",\n  \"email\": \"client@example.com\",\n  \"phone\": \"9876543210\"\n}"
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"companyName\": \"ABC Solutions Pvt Ltd\",\n  \"email\": \"john.doe@abcsolutions.com\",\n  \"phone\": \"9876543210\",\n  \"assignedAdmin\": null\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/clients",
@@ -566,7 +627,7 @@
           "response": []
         },
         {
-          "name": "Get Client Details",
+          "name": "Get Client by ID",
           "request": {
             "method": "GET",
             "header": [],
@@ -583,7 +644,8 @@
               "variable": [
                 {
                   "key": "clientId",
-                  "value": ""
+                  "value": "",
+                  "description": "Client MongoDB ID"
                 }
               ]
             }
@@ -602,7 +664,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Client Name\",\n  \"status\": \"ACTIVE\"\n}"
+              "raw": "{\n  \"name\": \"John Doe Updated\",\n  \"companyName\": \"ABC Solutions Ltd\",\n  \"email\": \"john.updated@abcsolutions.com\",\n  \"phone\": \"9876543210\",\n  \"status\": \"ACTIVE\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/clients/:clientId",
@@ -617,7 +679,8 @@
               "variable": [
                 {
                   "key": "clientId",
-                  "value": ""
+                  "value": "",
+                  "description": "Client MongoDB ID"
                 }
               ]
             }
@@ -625,7 +688,7 @@
           "response": []
         },
         {
-          "name": "Delete Client",
+          "name": "Delete Client (SUPER_ADMIN only)",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -642,7 +705,8 @@
               "variable": [
                 {
                   "key": "clientId",
-                  "value": ""
+                  "value": "",
+                  "description": "Client MongoDB ID"
                 }
               ]
             }
@@ -650,7 +714,7 @@
           "response": []
         },
         {
-          "name": "Assign Client to Admin",
+          "name": "Assign Client to Admin (SUPER_ADMIN only)",
           "request": {
             "method": "POST",
             "header": [
@@ -677,7 +741,35 @@
               "variable": [
                 {
                   "key": "clientId",
-                  "value": ""
+                  "value": "",
+                  "description": "Client MongoDB ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unassign Client from Admin (SUPER_ADMIN only)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/:clientId/unassign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                ":clientId",
+                "unassign"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": "",
+                  "description": "Client MongoDB ID"
                 }
               ]
             }
@@ -687,23 +779,63 @@
       ]
     },
     {
-      "name": "Phase 4 - Company Management",
+      "name": "Phase 2.3 - Company Management",
       "item": [
+        {
+          "name": "Get Company Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/companies/stats/overview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                "stats",
+                "overview"
+              ],
+              "query": []
+            },
+            "description": "Get company statistics (SUPER_ADMIN, ADMIN only)\n- Total companies\n- Active/Inactive counts\n- Companies with/without members"
+          },
+          "response": []
+        },
         {
           "name": "List Companies",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/companies",
+              "raw": "{{baseUrl}}/api/companies?status=ACTIVE&search=&client=",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "companies"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "description": "Filter by status (ACTIVE, INACTIVE)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by name, registration number, or email"
+                },
+                {
+                  "key": "client",
+                  "value": "",
+                  "description": "Filter by client ID"
+                }
               ]
-            }
+            },
+            "description": "List companies (role-based filtering)\n- SUPER_ADMIN: sees all\n- ADMIN: sees companies of assigned clients\n- USER: sees companies where they are members"
           },
           "response": []
         },
@@ -719,7 +851,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"My Company Ltd\",\n  \"registrationNumber\": \"REG123456\",\n  \"type\": \"PRIVATE_LIMITED\"\n}"
+              "raw": "{\n  \"name\": \"Tech Solutions Pvt Ltd\",\n  \"registrationNumber\": \"CIN12345ABC\",\n  \"email\": \"contact@techsolutions.com\",\n  \"phone\": \"9876543210\",\n  \"address\": {\n    \"street\": \"123 Main Street\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"country\": \"India\"\n  },\n  \"client\": \"65f1234567890abcdef12345\",\n  \"members\": [\n    {\n      \"user\": \"65f1234567890abcdef67890\",\n      \"role\": \"OWNER\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/companies",
@@ -730,7 +862,8 @@
                 "api",
                 "companies"
               ]
-            }
+            },
+            "description": "Create new company\n- SUPER_ADMIN: any client\n- ADMIN: only assigned clients\n- USER: auto-added as OWNER"
           },
           "response": []
         },
@@ -740,22 +873,24 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/companies/:companyId",
+              "raw": "{{baseUrl}}/api/companies/:id",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "companies",
-                ":companyId"
+                ":id"
               ],
               "variable": [
                 {
-                  "key": "companyId",
-                  "value": ""
+                  "key": "id",
+                  "value": "65f1234567890abcdef12345",
+                  "description": "Company ID"
                 }
               ]
-            }
+            },
+            "description": "Get company details\n- SUPER_ADMIN: any company\n- ADMIN: companies of assigned clients\n- USER: only if member"
           },
           "response": []
         },
@@ -771,25 +906,27 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Company Name\"\n}"
+              "raw": "{\n  \"name\": \"Updated Tech Solutions Pvt Ltd\",\n  \"registrationNumber\": \"CIN12345ABC\",\n  \"email\": \"info@techsolutions.com\",\n  \"phone\": \"9876543211\",\n  \"address\": {\n    \"street\": \"456 New Street\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400002\",\n    \"country\": \"India\"\n  },\n  \"status\": \"ACTIVE\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/companies/:companyId",
+              "raw": "{{baseUrl}}/api/companies/:id",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "companies",
-                ":companyId"
+                ":id"
               ],
               "variable": [
                 {
-                  "key": "companyId",
-                  "value": ""
+                  "key": "id",
+                  "value": "65f1234567890abcdef12345",
+                  "description": "Company ID"
                 }
               ]
-            }
+            },
+            "description": "Update company\n- SUPER_ADMIN: any company + can change status\n- ADMIN: companies of assigned clients\n- USER (OWNER): their companies only\nNote: status can only be changed by SUPER_ADMIN"
           },
           "response": []
         },
@@ -799,22 +936,139 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/companies/:companyId",
+              "raw": "{{baseUrl}}/api/companies/:id",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "companies",
-                ":companyId"
+                ":id"
               ],
               "variable": [
                 {
-                  "key": "companyId",
-                  "value": ""
+                  "key": "id",
+                  "value": "65f1234567890abcdef12345",
+                  "description": "Company ID"
                 }
               ]
-            }
+            },
+            "description": "Delete company (SUPER_ADMIN only)\n- Removes company from client's companies array\n- Permanently deletes company"
+          },
+          "response": []
+        },
+        {
+          "name": "Add Member to Company",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"65f1234567890abcdef67890\",\n  \"role\": \"EDITOR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/companies/:id/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                ":id",
+                "members"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "65f1234567890abcdef12345",
+                  "description": "Company ID"
+                }
+              ]
+            },
+            "description": "Add member to company\n- SUPER_ADMIN: any company\n- ADMIN: companies of assigned clients\n- USER (OWNER): their companies only\n\nRoles: OWNER, EDITOR, VIEWER"
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Member from Company",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/companies/:id/members/:userId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                ":id",
+                "members",
+                ":userId"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "65f1234567890abcdef12345",
+                  "description": "Company ID"
+                },
+                {
+                  "key": "userId",
+                  "value": "65f1234567890abcdef67890",
+                  "description": "User ID to remove"
+                }
+              ]
+            },
+            "description": "Remove member from company\n- SUPER_ADMIN: any company\n- ADMIN: companies of assigned clients\n- USER (OWNER): their companies only\n\nNote: Cannot remove last OWNER"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Member Role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"VIEWER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/companies/:id/members/:userId/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                ":id",
+                "members",
+                ":userId",
+                "role"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "65f1234567890abcdef12345",
+                  "description": "Company ID"
+                },
+                {
+                  "key": "userId",
+                  "value": "65f1234567890abcdef67890",
+                  "description": "User ID to update"
+                }
+              ]
+            },
+            "description": "Update member role\n- SUPER_ADMIN: any company\n- ADMIN: companies of assigned clients\n- USER (OWNER): their companies only\n\nRoles: OWNER, EDITOR, VIEWER\nNote: Cannot downgrade last OWNER"
           },
           "response": []
         }

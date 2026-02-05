@@ -47,11 +47,11 @@ module.exports = {
     COMPLETED: 'COMPLETED',
   },
 
-  // Company Roles
+  // Company Member Roles
   COMPANY_ROLES: {
-    OWNER: 'Owner',
-    ADMIN: 'Admin',
-    VIEWER: 'Viewer',
+    OWNER: 'OWNER',
+    EDITOR: 'EDITOR',
+    VIEWER: 'VIEWER',
   },
 
   // Admin Limits

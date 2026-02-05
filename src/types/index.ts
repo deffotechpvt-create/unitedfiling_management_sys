@@ -1,4 +1,21 @@
-
+export interface Client {
+  _id: string;
+  name: string;
+  companyName: string;
+  email?: string;
+  phone?: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  assignedAdmin?: {
+    _id: string;
+    name: string;
+    email: string;
+  } | null;
+  pendingWork: number;
+  completedWork: number;
+  joinedDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface User {
   id: string;

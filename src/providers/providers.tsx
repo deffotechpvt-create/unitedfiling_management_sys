@@ -7,6 +7,7 @@ import { AuthProvider } from "@/context/auth-context"
 import { Toaster } from "@/components/ui/sonner"
 
 import { SuperAdminProvider } from "@/context/super-admin-context"
+import { ClientProvider } from "@/context/client-context"
 
 const queryClient = new QueryClient()
 
@@ -16,8 +17,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <AuthProvider>
                 <SuperAdminProvider>
                     <CompanyProvider>
-                        {children}
-                        <Toaster />
+                        <ClientProvider>
+                            {children}
+                            <Toaster />
+                        </ClientProvider>
                     </CompanyProvider>
                 </SuperAdminProvider>
             </AuthProvider>

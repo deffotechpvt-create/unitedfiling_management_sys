@@ -4,47 +4,97 @@ const ApiResponse = require('../utils/ApiResponse');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const constants = require('../config/constants');
-const { sendEmail } = require('../config/email');
-const { clientAssignedEmail } = require('../utils/emailTemplates');
 
 /**
  * @desc    Get all clients
  * @route   GET /api/clients
- * @access  Private (SUPER_ADMIN: all, ADMIN: assigned only)
+ * @access  Private (SUPER_ADMIN, ADMIN)
  */
-exports.getAllClients = asyncHandler(async (req, res) => {
-    let filter = {};
+const getAllClients = asyncHandler(async (req, res) => {
+    const { status, assignedAdmin, search } = req.query;
 
-    // ADMIN can only see their assigned clients
+    // Build query
+    let query = {};
+
+    // Filter by status
+    if (status) {
+        query.status = status;
+    }
+
+    // Filter by assigned admin
+    if (assignedAdmin) {
+        if (assignedAdmin === 'unassigned') {
+            query.assignedAdmin = null;
+        } else {
+            query.assignedAdmin = assignedAdmin;
+        }
+    }
+
+    // If user is ADMIN, only show their clients
     if (req.user.role === constants.ROLES.ADMIN) {
-        filter.assignedAdmin = req.user._id;
+        query.assignedAdmin = req.user._id;
     }
 
-    const { status, assignedAdmin } = req.query;
-
-    if (status) filter.status = status;
-    if (assignedAdmin && req.user.role === constants.ROLES.SUPER_ADMIN) {
-        filter.assignedAdmin = assignedAdmin;
+    // Search by name, company, email, phone
+    if (search) {
+        query.$or = [
+            { name: { $regex: search, $options: 'i' } },
+            { companyName: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } },
+            { phone: { $regex: search, $options: 'i' } },
+        ];
     }
 
-    const clients = await Client.find(filter)
+    const clients = await Client.find(query)
         .populate('assignedAdmin', 'name email')
-        .populate('companies', 'name registrationNumber')
         .populate('userId', 'name email')
         .sort({ createdAt: -1 });
 
     res.status(200).json(
-        new ApiResponse(200, { clients, count: clients.length }, 'Clients retrieved successfully')
+        new ApiResponse(200, {
+            clients,
+            message: 'Clients retrieved successfully'
+        })
+    );
+});
+
+/**
+ * @desc    Get single client by ID
+ * @route   GET /api/clients/:id
+ * @access  Private (SUPER_ADMIN, ADMIN)
+ */
+const getClientById = asyncHandler(async (req, res) => {
+    const client = await Client.findById(req.params.id)
+        .populate('assignedAdmin', 'name email phone')
+        .populate('userId', 'name email')
+        .populate('companies');
+
+    if (!client) {
+        throw new ApiError(404, 'Client not found');
+    }
+
+    // If ADMIN, can only view their own clients
+    if (req.user.role === constants.ROLES.ADMIN) {
+        if (!client.assignedAdmin || client.assignedAdmin._id.toString() !== req.user._id.toString()) {
+            throw new ApiError(403, 'Not authorized to view this client');
+        }
+    }
+
+    res.status(200).json(
+        new ApiResponse(200, {
+            client,
+            message: 'Client retrieved successfully'
+        })
     );
 });
 
 /**
  * @desc    Create new client
  * @route   POST /api/clients
- * @access  Private (SUPER_ADMIN only)
+ * @access  Private (SUPER_ADMIN, ADMIN)
  */
-exports.createClient = asyncHandler(async (req, res) => {
-    const { name, companyName, email, phone, userId, assignedAdmin } = req.body;
+const createClient = asyncHandler(async (req, res) => {
+    const { name, companyName, email, phone, assignedAdmin } = req.body;
 
     // Check if email already exists
     if (email) {
@@ -54,92 +104,92 @@ exports.createClient = asyncHandler(async (req, res) => {
         }
     }
 
-    // Create client
+    // If ADMIN creates client, auto-assign to themselves
+    let adminToAssign = assignedAdmin;
+    if (req.user.role === constants.ROLES.ADMIN) {
+        adminToAssign = req.user._id;
+    }
+
+    // Validate admin if provided
+    if (adminToAssign) {
+        const admin = await User.findById(adminToAssign);
+        if (!admin || admin.role !== constants.ROLES.ADMIN) {
+            throw new ApiError(400, 'Invalid admin ID');
+        }
+
+        // Check admin capacity
+        const clientCount = await Client.countDocuments({ assignedAdmin: adminToAssign });
+        if (clientCount >= constants.MAX_CLIENTS_PER_ADMIN) {
+            throw new ApiError(400, `Admin has reached maximum capacity of ${constants.MAX_CLIENTS_PER_ADMIN} clients`);
+        }
+    }
+
     const client = await Client.create({
         name,
         companyName,
         email,
         phone,
-        userId,
-        assignedAdmin: assignedAdmin || null,
+        assignedAdmin: adminToAssign,
     });
 
-    // If assigned to admin, send notification email
-    if (assignedAdmin) {
-        const admin = await User.findById(assignedAdmin);
-        if (admin && admin.email) {
-            sendEmail({
-                to: admin.email,
-                ...clientAssignedEmail(admin.name, client.name),
-            }).catch(err => console.error('Error sending assignment email:', err));
-        }
-    }
-
     const populatedClient = await Client.findById(client._id)
-        .populate('assignedAdmin', 'name email')
-        .populate('userId', 'name email');
+        .populate('assignedAdmin', 'name email');
 
     res.status(201).json(
-        new ApiResponse(201, { client: populatedClient }, 'Client created successfully')
-    );
-});
-
-/**
- * @desc    Get single client by ID
- * @route   GET /api/clients/:id
- * @access  Private (SUPER_ADMIN: all, ADMIN: assigned only)
- */
-exports.getClientById = asyncHandler(async (req, res) => {
-    const client = await Client.findById(req.params.id)
-        .populate('assignedAdmin', 'name email')
-        .populate('companies', 'name registrationNumber email phone')
-        .populate('userId', 'name email');
-
-    if (!client) {
-        throw new ApiError(404, 'Client not found');
-    }
-
-    // ADMIN can only view their assigned clients
-    if (req.user.role === constants.ROLES.ADMIN) {
-        if (!client.assignedAdmin || client.assignedAdmin._id.toString() !== req.user._id.toString()) {
-            throw new ApiError(403, 'Not authorized to view this client');
-        }
-    }
-
-    res.status(200).json(
-        new ApiResponse(200, { client }, 'Client retrieved successfully')
+        new ApiResponse(201, {
+            client: populatedClient,
+            message: 'Client created successfully'
+        })
     );
 });
 
 /**
  * @desc    Update client
  * @route   PUT /api/clients/:id
- * @access  Private (SUPER_ADMIN only)
+ * @access  Private (SUPER_ADMIN, ADMIN)
  */
-exports.updateClient = asyncHandler(async (req, res) => {
-    const { name, companyName, email, phone, status } = req.body;
-
+const updateClient = asyncHandler(async (req, res) => {
     const client = await Client.findById(req.params.id);
 
     if (!client) {
         throw new ApiError(404, 'Client not found');
     }
 
+    // If ADMIN, can only update their own clients
+    if (req.user.role === constants.ROLES.ADMIN) {
+        if (!client.assignedAdmin || client.assignedAdmin.toString() !== req.user._id.toString()) {
+            throw new ApiError(403, 'Not authorized to update this client');
+        }
+        // ADMIN cannot change assignedAdmin
+        delete req.body.assignedAdmin;
+    }
+
+    // Check email uniqueness if updating
+    if (req.body.email && req.body.email !== client.email) {
+        const existingClient = await Client.findOne({ email: req.body.email });
+        if (existingClient) {
+            throw new ApiError(400, 'Client with this email already exists');
+        }
+    }
+
     // Update fields
-    if (name) client.name = name;
-    if (companyName) client.companyName = companyName;
-    if (email) client.email = email;
-    if (phone) client.phone = phone;
-    if (status) client.status = status;
+    const allowedFields = ['name', 'companyName', 'email', 'phone', 'status', 'assignedAdmin'];
+    allowedFields.forEach(field => {
+        if (req.body[field] !== undefined) {
+            client[field] = req.body[field];
+        }
+    });
 
     await client.save();
 
     const updatedClient = await Client.findById(client._id)
-        .populate('assignedAdmin', 'name email')
-        .populate('companies', 'name');
+        .populate('assignedAdmin', 'name email');
 
     res.status(200).json(
-        new ApiResponse(200, { client: updatedClient }, 'Client updated successfully')
+        new ApiResponse(200, {
+            client: updatedClient,
+            message: 'Client updated successfully'
+        })
     );
 });
 
@@ -148,22 +198,27 @@ exports.updateClient = asyncHandler(async (req, res) => {
  * @route   DELETE /api/clients/:id
  * @access  Private (SUPER_ADMIN only)
  */
-exports.deleteClient = asyncHandler(async (req, res) => {
+const deleteClient = asyncHandler(async (req, res) => {
     const client = await Client.findById(req.params.id);
 
     if (!client) {
         throw new ApiError(404, 'Client not found');
     }
 
-    // Unassign from admin first
+    // Remove from admin's managedClients if assigned
     if (client.assignedAdmin) {
-        await client.unassign();
+        await User.findByIdAndUpdate(
+            client.assignedAdmin,
+            { $pull: { managedClients: client._id } }
+        );
     }
 
-    await client.remove();
+    await Client.findByIdAndDelete(req.params.id);
 
     res.status(200).json(
-        new ApiResponse(200, null, 'Client deleted successfully')
+        new ApiResponse(200, {
+            message: 'Client deleted successfully'
+        })
     );
 });
 
@@ -172,55 +227,49 @@ exports.deleteClient = asyncHandler(async (req, res) => {
  * @route   POST /api/clients/:id/assign
  * @access  Private (SUPER_ADMIN only)
  */
-exports.assignClient = asyncHandler(async (req, res) => {
+const assignClientToAdmin = asyncHandler(async (req, res) => {
     const { adminId } = req.body;
 
-    if (!adminId) {
-        throw new ApiError(400, 'Admin ID is required');
-    }
-
     const client = await Client.findById(req.params.id);
-
     if (!client) {
         throw new ApiError(404, 'Client not found');
     }
 
+    // Validate admin
     const admin = await User.findById(adminId);
-
-    if (!admin) {
-        throw new ApiError(404, 'Admin not found');
+    if (!admin || admin.role !== constants.ROLES.ADMIN) {
+        throw new ApiError(400, 'Invalid admin ID or user is not an admin');
     }
 
-    if (admin.role !== constants.ROLES.ADMIN) {
-        throw new ApiError(400, 'User is not an admin');
-    }
+    // Check admin capacity
+    const clientCount = await Client.countDocuments({
+        assignedAdmin: adminId,
+        _id: { $ne: client._id } // Exclude current client
+    });
 
-    // Check if admin has capacity
-    if (!admin.canAddClient()) {
+    if (clientCount >= constants.MAX_CLIENTS_PER_ADMIN) {
         throw new ApiError(400, `Admin has reached maximum capacity of ${constants.MAX_CLIENTS_PER_ADMIN} clients`);
     }
 
-    // Unassign from previous admin if exists
-    if (client.assignedAdmin && client.assignedAdmin.toString() !== adminId) {
-        await client.unassign();
+    // Remove from old admin if exists
+    if (client.assignedAdmin) {
+        await User.findByIdAndUpdate(
+            client.assignedAdmin,
+            { $pull: { managedClients: client._id } }
+        );
     }
 
     // Assign to new admin
     await client.assignToAdmin(adminId);
 
-    // Send notification email
-    if (admin.email) {
-        sendEmail({
-            to: admin.email,
-            ...clientAssignedEmail(admin.name, client.name),
-        }).catch(err => console.error('Error sending assignment email:', err));
-    }
-
     const updatedClient = await Client.findById(client._id)
         .populate('assignedAdmin', 'name email');
 
     res.status(200).json(
-        new ApiResponse(200, { client: updatedClient }, 'Client assigned successfully')
+        new ApiResponse(200, {
+            client: updatedClient,
+            message: 'Client assigned successfully'
+        })
     );
 });
 
@@ -229,7 +278,7 @@ exports.assignClient = asyncHandler(async (req, res) => {
  * @route   POST /api/clients/:id/unassign
  * @access  Private (SUPER_ADMIN only)
  */
-exports.unassignClient = asyncHandler(async (req, res) => {
+const unassignClient = asyncHandler(async (req, res) => {
     const client = await Client.findById(req.params.id);
 
     if (!client) {
@@ -245,21 +294,78 @@ exports.unassignClient = asyncHandler(async (req, res) => {
     const updatedClient = await Client.findById(client._id);
 
     res.status(200).json(
-        new ApiResponse(200, { client: updatedClient }, 'Client unassigned successfully')
+        new ApiResponse(200, {
+            client: updatedClient,
+            message: 'Client unassigned successfully'
+        })
     );
 });
 
 /**
  * @desc    Get unassigned clients
- * @route   GET /api/clients/unassigned
+ * @route   GET /api/clients/unassigned/list
  * @access  Private (SUPER_ADMIN only)
  */
-exports.getUnassignedClients = asyncHandler(async (req, res) => {
+const getUnassignedClients = asyncHandler(async (req, res) => {
     const clients = await Client.findUnassigned()
-        .populate('userId', 'name email')
-        .populate('companies', 'name');
+        .sort({ createdAt: -1 });
 
     res.status(200).json(
-        new ApiResponse(200, { clients, count: clients.length }, 'Unassigned clients retrieved successfully')
+        new ApiResponse(200, {
+            clients,
+            count: clients.length,
+            message: 'Unassigned clients retrieved successfully'
+        })
     );
 });
+
+/**
+ * @desc    Get client statistics
+ * @route   GET /api/clients/stats/overview
+ * @access  Private (SUPER_ADMIN, ADMIN)
+ */
+const getClientStats = asyncHandler(async (req, res) => {
+    let query = {};
+
+    // If ADMIN, only their clients
+    if (req.user.role === constants.ROLES.ADMIN) {
+        query.assignedAdmin = req.user._id;
+    }
+
+    const totalClients = await Client.countDocuments(query);
+    const activeClients = await Client.countDocuments({ ...query, status: constants.CLIENT_STATUS.ACTIVE });
+    const inactiveClients = await Client.countDocuments({ ...query, status: constants.CLIENT_STATUS.INACTIVE });
+    const unassignedClients = await Client.countDocuments({ ...query, assignedAdmin: null });
+
+    // Work statistics
+    const clients = await Client.find(query);
+    const totalPendingWork = clients.reduce((sum, c) => sum + c.pendingWork, 0);
+    const totalCompletedWork = clients.reduce((sum, c) => sum + c.completedWork, 0);
+
+    res.status(200).json(
+        new ApiResponse(200, {
+            stats: {
+                totalClients,
+                activeClients,
+                inactiveClients,
+                unassignedClients,
+                totalPendingWork,
+                totalCompletedWork,
+                totalWork: totalPendingWork + totalCompletedWork,
+            },
+            message: 'Client statistics retrieved successfully'
+        })
+    );
+});
+
+module.exports = {
+    getAllClients,
+    getClientById,
+    createClient,
+    updateClient,
+    deleteClient,
+    assignClientToAdmin,
+    unassignClient,
+    getUnassignedClients,
+    getClientStats,
+};
