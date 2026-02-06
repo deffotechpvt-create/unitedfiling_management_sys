@@ -72,8 +72,8 @@ export function CompliancesPageClient() {
     }
 
     const { data: compliances = [], isLoading } = useQuery({
-        queryKey: ["compliances", selectedCompany.id],
-        queryFn: () => fetchCompliances(selectedCompany.id),
+        queryKey: ["compliances", selectedCompany?._id],
+        queryFn: () => fetchCompliances(selectedCompany?._id || ""),
     })
 
     const handleDeptChange = (val: string) => {
@@ -298,8 +298,8 @@ export function CompliancesPageClient() {
                             key={tab.name}
                             onClick={() => setActiveTab(tab.name)}
                             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.name
-                                    ? "border-slate-900 text-slate-900"
-                                    : "border-transparent text-slate-500 hover:text-slate-700"
+                                ? "border-slate-900 text-slate-900"
+                                : "border-transparent text-slate-500 hover:text-slate-700"
                                 }`}
                         >
                             {tab.name} <span className="text-xs text-slate-400 ml-1">({tab.count})</span>

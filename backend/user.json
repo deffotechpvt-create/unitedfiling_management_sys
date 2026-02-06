@@ -1,0 +1,221 @@
+{
+    "info": {
+        "name": "United Fillings - USER Seed Data",
+        "description": "Collection to populate database with dummy data for USER role testing",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1. Register as User - Deepak Rao",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"name\": \"Deepak Rao\",\n  \"email\": \"deepak.rao@gmail.com\",\n  \"password\": \"User@123\",\n  \"phone\": \"9345678901\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/auth/register",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "auth",
+                        "register"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "2. Login as User (Deepak Rao)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"email\": \"deepak.rao@gmail.com\",\n  \"password\": \"User@123\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/auth/login",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "auth",
+                        "login"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "3. Create Company 1 - Rao Consultancy",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"name\": \"Rao Consultancy Services\",\n  \"registrationNumber\": \"CIN005RAO2024\",\n  \"email\": \"contact@raoconsultancy.com\",\n  \"phone\": \"9345678901\",\n  \"address\": {\n    \"street\": \"MG Road, Suite 302\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"country\": \"India\"\n  },\n  \"client\": \"{{client5_id}}\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/companies",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "companies"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "4. Create Company 2 - Rao Exports",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"name\": \"Rao Exports International\",\n  \"registrationNumber\": \"CIN006RAO2024\",\n  \"email\": \"exports@rao.com\",\n  \"phone\": \"9345678902\",\n  \"address\": {\n    \"street\": \"Export House, Sector 15\",\n    \"city\": \"Pune\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"411001\",\n    \"country\": \"India\"\n  },\n  \"client\": \"{{client5_id}}\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/companies",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "companies"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "5. Get My Companies",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/api/companies",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "companies"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "6. Update Company 1 Details",
+            "request": {
+                "method": "PUT",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"name\": \"Rao Consultancy Services Pvt Ltd\",\n  \"registrationNumber\": \"CIN005RAO2024\",\n  \"email\": \"info@raoconsultancy.com\",\n  \"phone\": \"9345678901\",\n  \"address\": {\n    \"street\": \"MG Road, Suite 302-303\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"country\": \"India\"\n  }\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/companies/{{company1_id}}",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "companies",
+                        "{{company1_id}}"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "7. Get My Profile",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/api/auth/me",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "auth",
+                        "me"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "8. Update My Profile",
+            "request": {
+                "method": "PUT",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"name\": \"Deepak Rao\",\n  \"phone\": \"9345678901\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/auth/profile",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "auth",
+                        "profile"
+                    ]
+                }
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:5000",
+            "type": "string"
+        },
+        {
+            "key": "client5_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "company1_id",
+            "value": "",
+            "type": "string"
+        }
+    ]
+}

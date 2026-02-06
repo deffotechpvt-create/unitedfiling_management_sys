@@ -24,9 +24,9 @@ export function Header() {
                 {user?.role !== "USER" && (
                     <div className="w-[180px] md:w-[240px]">
                         <Select
-                            value={selectedCompany.id}
+                            value={selectedCompany?._id || ''}
                             onValueChange={(value) => {
-                                const company = companies.find((c) => c.id === value)
+                                const company = companies.find((c) => c._id === value)
                                 if (company) setSelectedCompany(company)
                             }}
                         >
@@ -34,12 +34,15 @@ export function Header() {
                                 <SelectValue placeholder="Select company" />
                             </SelectTrigger>
                             <SelectContent>
-                                {companies.map((company) => (
-                                    <SelectItem key={company.id} value={company.id}>
-                                        <span className="font-medium text-slate-900">{company.name}</span>
-                                        <span className="ml-2 text-xs text-slate-500">({company.role})</span>
-                                    </SelectItem>
-                                ))}
+                                {companies.map((company) => {
+                                    const memberRole = company.members.find((m: any) => m.userId === user?.id || m.user === user?.id)?.role
+                                    return (
+                                        <SelectItem key={company._id} value={company._id}>
+                                            <span className="font-medium text-slate-900">{company.name}</span>
+                                            <span className="ml-2 text-xs text-slate-500">({memberRole ?? `${company.members.length} members`})</span>
+                                        </SelectItem>
+                                    )
+                                })}
                             </SelectContent>
                         </Select>
                     </div>

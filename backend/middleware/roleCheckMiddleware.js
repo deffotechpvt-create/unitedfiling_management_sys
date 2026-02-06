@@ -8,21 +8,23 @@ const ApiError = require('../utils/ApiError');
 const checkRole = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
-      throw new ApiError(401, 'Authentication required');
+      return next(new ApiError(401, 'Authentication required'));
     }
 
-    // Check against the role from JWT token (more secure)
-    const userRole = req.user.tokenRole || req.user.role;
+    const userRole = req.user.role;
 
     if (!roles.includes(userRole)) {
-      throw new ApiError(
+      return next(new ApiError(
         403,
-        `Access denied. Required roles: ${roles.join(', ')}. Your role: ${userRole}`
-      );
+        `Access denied. Required roles: ${roles.join(',')}. Your role: ${userRole}`
+      ));
     }
 
     next();
   };
 };
+
+module.exports = checkRole;
+
 
 module.exports = checkRole;

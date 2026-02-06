@@ -294,7 +294,7 @@ export default function LoginPage() {
                             onClick={async () => {
                                 setFormError("");
                                 try {
-                                    await login({ email: "john@example.com", password: "password123" });
+                                    await login({ email: "deepak.rao@gmail.com", password: "User@123" });
                                 } catch (err: any) {
                                     setFormError(err.message);
                                 }

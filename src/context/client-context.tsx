@@ -45,22 +45,28 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [filters, setFilters] = useState<ClientFilters>({});
+    const [initialized, setInitialized] = useState(false);
     const { user } = useAuth();
 
-    // Load clients on mount
+    // Load clients on mount and when filters change
     useEffect(() => {
         if (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") {
-            // getAllClients();
-            getClientStats();
+            if (!initialized) {
+                getAllClients(filters);
+                getClientStats();
+                setInitialized(true);
+            }
         }
-    }, [user]);
+    }, [user?.role, initialized]);
 
-    // Reload clients when filters change
+    // ✅ Reload ONLY when filters change (NOT on mount)
     useEffect(() => {
-        if (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") {
+        if (initialized && (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN")) {
             getAllClients(filters);
         }
-    }, [filters,user]);
+    }, [filters]);
+
+
 
     const getAllClients = async (filterParams?: ClientFilters) => {
         try {

@@ -5,13 +5,13 @@ const { protect } = require('../middleware/authMiddleware');
 const  checkRole  = require('../middleware/roleCheckMiddleware');
 const constants = require('../config/constants');
 
-const { SUPER_ADMIN, ADMIN, USER } = constants.ROLES;
+const { SUPER_ADMIN, ADMIN } = constants.ROLES;
 
 // Statistics (before :id routes)
 router.get(
     '/stats/overview',
     protect,
-    checkRole([SUPER_ADMIN, ADMIN]),
+    checkRole(SUPER_ADMIN, ADMIN),
     companyController.getCompanyStats
 );
 
@@ -23,7 +23,7 @@ router.route('/')
 router.route('/:id')
     .get(protect, companyController.getCompanyById) // All roles (with access check)
     .put(protect, companyController.updateCompany) // SUPER_ADMIN, ADMIN, OWNER
-    .delete(protect, checkRole([SUPER_ADMIN]), companyController.deleteCompany);
+    .delete(protect, checkRole(SUPER_ADMIN), companyController.deleteCompany);
 
 // Member Management
 router.post(

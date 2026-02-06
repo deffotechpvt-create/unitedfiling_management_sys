@@ -1,0 +1,227 @@
+{
+    "info": {
+        "name": "United Fillings - ADMIN Seed Data",
+        "description": "Collection to populate database with dummy data for ADMIN testing (Rajesh Kumar)",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1. Login as Admin (Rajesh Kumar)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"email\": \"rajesh.kumar@unitedfillings.com\",\n  \"password\": \"Admin@123\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/auth/login",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "auth",
+                        "login"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "2. Register User 1 - Ananya Iyer",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"name\": \"Ananya Iyer\",\n  \"email\": \"ananya.iyer@techcorp.com\",\n  \"password\": \"User@123\",\n  \"phone\": \"9234567890\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/auth/register",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "auth",
+                        "register"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "3. Register User 2 - Karthik Suresh",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"name\": \"Karthik Suresh\",\n  \"email\": \"karthik.suresh@techcorp.com\",\n  \"password\": \"User@123\",\n  \"phone\": \"9234567891\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/auth/register",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "auth",
+                        "register"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "4. Create Company for Assigned Client",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"name\": \"TechCorp Innovation Lab\",\n  \"registrationNumber\": \"CIN004TECH2024\",\n  \"email\": \"lab@techcorp.com\",\n  \"phone\": \"9123456785\",\n  \"address\": {\n    \"street\": \"Innovation Block, IT Park\",\n    \"city\": \"Bangalore\",\n    \"state\": \"Karnataka\",\n    \"pincode\": \"560002\",\n    \"country\": \"India\"\n  },\n  \"client\": \"{{client1_id}}\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/companies",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "companies"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "5. Update Client 1 Details",
+            "request": {
+                "method": "PUT",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"name\": \"Vikram Singh\",\n  \"companyName\": \"TechCorp Solutions Pvt Ltd\",\n  \"email\": \"vikram@techcorp.com\",\n  \"phone\": \"9123456780\",\n  \"status\": \"ACTIVE\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/api/clients/{{client1_id}}",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "clients",
+                        "{{client1_id}}"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "6. Get My Assigned Clients",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/api/clients",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "clients"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "7. Get Client Statistics",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/api/clients/stats/overview",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "clients",
+                        "stats",
+                        "overview"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "8. Get Companies of Assigned Clients",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/api/companies",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "companies"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "9. Get Company Statistics",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/api/companies/stats/overview",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "api",
+                        "companies",
+                        "stats",
+                        "overview"
+                    ]
+                }
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:5000",
+            "type": "string"
+        },
+        {
+            "key": "client1_id",
+            "value": "",
+            "type": "string"
+        }
+    ]
+}
