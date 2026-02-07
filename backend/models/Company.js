@@ -35,6 +35,10 @@ const CompanySchema = new mongoose.Schema({
             trim: true,
         },
     },
+    industry: {
+        type: String,
+        trim: true,
+    },
 
     // Ownership
     client: {

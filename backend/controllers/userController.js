@@ -1,4 +1,3 @@
-// controllers/userController.js
 const User = require('../models/User');
 const Client = require('../models/Client');
 const ApiResponse = require('../utils/ApiResponse');
@@ -6,26 +5,60 @@ const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const constants = require('../config/constants');
 
+exports.getServerStats = asyncHandler(async (req, res) => {
+  const uptimeSeconds = process.uptime();
+  const uptimePercentage = 99.9; // You can calculate based on logs/monitoring service
+
+  // Format uptime
+  const days = Math.floor(uptimeSeconds / 86400);
+  const hours = Math.floor((uptimeSeconds % 86400) / 3600);
+  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+  const serverData = {
+    uptimeSeconds,
+    uptimeFormatted: `${days}d ${hours}h ${minutes}m`,
+    uptimePercentage,
+    serverStartTime: new Date(Date.now() - uptimeSeconds * 1000).toISOString(),
+  }
+  res.status(200).json(
+    new ApiResponse(200, {
+      serverData
+    })
+  );
+});
 /**
  * @desc    Get all users (filtered by role)
  * @route   GET /api/users
  * @access  Private (SUPER_ADMIN only)
  */
 exports.getAllUsers = asyncHandler(async (req, res) => {
-  const { role, status } = req.query;
+  // const { role, status } = req.query;
 
-  const filter = {};
-  if (role) filter.role = role;
-  if (status) filter.status = status; // ✅ Changed from isActive to status
+  // const filter = {};
 
-  const users = await User.find(filter)
-    .select('-password') // ✅ Exclude password
+  // // Security Enforcement: ADMIN can only see USER role accounts
+  // if (req.user.role === constants.ROLES.ADMIN) {
+  //   filter.role = constants.ROLES.USER;
+  // } else if (role) {
+  //   filter.role = role;
+  // }
+
+  // if (status) filter.status = status;
+
+  const users = await User.find({ role: constants.ROLES.USER })
+    .select('name email status createdAt')
     .sort({ createdAt: -1 });
-
+  const sanitizedUsers = users.map(u => ({
+    _id: u._id,
+    name: u.name,
+    email: u.email,
+    status: u.status,        // or u.isActive ? 'ACTIVE' : 'INACTIVE'
+    createdAt: u.createdAt, // format on frontend if needed
+  }));
   res.status(200).json(
     new ApiResponse(200, {
-      users,
-      count: users.length
+      users: sanitizedUsers,
+      count: users.length,
+      message: 'Users retrieved successfully'
     })
   );
 });
@@ -41,13 +74,20 @@ exports.getAllAdmins = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 });
 
   // Get client counts for each admin
+  const { company: companyId } = req.query;
+  const { role: userRole } = req.user;
+
   const adminsWithUtilization = await Promise.all(
     admins.map(async (admin) => {
-      const clientCount = await Client.countDocuments({
-        assignedAdmin: admin._id
-      });
+      const clientFilter = { assignedAdmin: admin._id };
+      if (companyId) {
+        // Find clients that have this company associated
+        clientFilter.companies = companyId;
+      }
 
-      const clients = await Client.find({ assignedAdmin: admin._id })
+      const clientCount = await Client.countDocuments(clientFilter);
+
+      const clients = await Client.find(clientFilter)
         .select('name companyName pendingWork completedWork');
 
       const totalPending = clients.reduce((sum, c) => sum + (c.pendingWork || 0), 0);
@@ -76,7 +116,8 @@ exports.getAllAdmins = asyncHandler(async (req, res) => {
   res.status(200).json(
     new ApiResponse(200, {
       admins: adminsWithUtilization,
-      count: adminsWithUtilization.length
+      count: adminsWithUtilization.length,
+      message: 'Admins retrieved successfully'
     })
   );
 });
@@ -102,7 +143,7 @@ exports.createAdmin = asyncHandler(async (req, res) => {
     password,
     phone,
     role: constants.ROLES.ADMIN,
-    status: 'ACTIVE', // ✅ Set default status
+    status: 'ACTIVE',
   });
 
   res.status(201).json(
@@ -144,7 +185,8 @@ exports.getUserById = asyncHandler(async (req, res) => {
       user: {
         ...user.toObject(),
         clients: clients.length > 0 ? clients : undefined,
-      }
+      },
+      message: 'User retrieved successfully'
     })
   );
 });
@@ -155,7 +197,7 @@ exports.getUserById = asyncHandler(async (req, res) => {
  * @access  Private (SUPER_ADMIN only)
  */
 exports.updateUserStatus = asyncHandler(async (req, res) => {
-  const { status } = req.body; // ✅ Changed from isActive to status
+  const { status } = req.body;
 
   // Validate status
   if (!['ACTIVE', 'INACTIVE'].includes(status)) {
@@ -172,9 +214,21 @@ exports.updateUserStatus = asyncHandler(async (req, res) => {
   if (user.role === constants.ROLES.SUPER_ADMIN && status === 'INACTIVE') {
     throw new ApiError(403, 'Cannot deactivate super admin user');
   }
+  if (user.role === constants.ROLES.ADMIN && status === 'INACTIVE') {
+    const assignedClientsCount = await Client.countDocuments({
+      assignedAdmin: user._id,
+      status: constants.STATUS.ACTIVE
+    });
 
+    if (assignedClientsCount > 0) {
+      throw new ApiError(
+        400,
+        `Cannot deactivate admin. They have ${assignedClientsCount} active client${assignedClientsCount > 1 ? 's' : ''} assigned. Please reassign or remove clients first.`
+      );
+    }
+  }
   user.status = status;
-  
+
   await user.save();
 
   res.status(200).json(
@@ -185,7 +239,7 @@ exports.updateUserStatus = asyncHandler(async (req, res) => {
         email: user.email,
         status: user.status,
       },
-      message: `User ${status === 'ACTIVE' ? 'activated' : 'deactivated'} successfully`
+      message: `${user.role} ${status === 'ACTIVE' ? 'activated' : 'deactivated'} successfully`
     })
   );
 });
@@ -215,10 +269,10 @@ exports.deleteUser = asyncHandler(async (req, res) => {
     }
   }
 
-  await User.findByIdAndDelete(req.params.id); // ✅ Changed from user.remove()
+  await User.findByIdAndDelete(req.params.id);
 
   res.status(200).json(
-    new ApiResponse(200, 'User deleted successfully')
+    new ApiResponse(200, { message: 'User deleted successfully' })
   );
 });
 
@@ -238,8 +292,13 @@ exports.getAdminUtilization = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'User is not an admin');
   }
 
-  const clients = await Client.find({ assignedAdmin: admin._id })
-    .select('name companyName pendingWork completedWork status email phone');
+  const { company: companyId } = req.query;
+  const clientFilter = { assignedAdmin: admin._id };
+  if (companyId) {
+    clientFilter.companies = companyId;
+  }
+
+  const clients = await Client.find(clientFilter)
 
   const clientCount = clients.length;
   const totalPending = clients.reduce((sum, c) => sum + (c.pendingWork || 0), 0);
@@ -263,6 +322,9 @@ exports.getAdminUtilization = asyncHandler(async (req, res) => {
   };
 
   res.status(200).json(
-    new ApiResponse(200, utilization)
+    new ApiResponse(200, {
+      ...utilization,
+      message: 'Admin utilization retrieved successfully'
+    })
   );
 });

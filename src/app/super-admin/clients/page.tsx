@@ -31,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Users, Search, Download, Plus, Pencil, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useClient } from "@/context/client-context";
+import { useCompany } from "@/context/company-context";
 import { userService } from "@/services/userService";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -46,8 +47,20 @@ export default function ClientListPage() {
         updateClient,
         deleteClient,
         assignClientToAdmin,
+        unassignClient,
         refreshClients,
     } = useClient();
+    const { selectedCompany } = useCompany();
+
+    // ✅ Manually sync global company filter to this specific page
+    useEffect(() => {
+        if (selectedCompany?._id) {
+            setFilters({ ...filters, company: selectedCompany._id });
+        } else {
+            const { company, ...rest } = filters;
+            setFilters(rest);
+        }
+    }, [selectedCompany?._id]);
 
     const [admins, setAdmins] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
@@ -99,8 +112,7 @@ export default function ClientListPage() {
     const handleAssignChange = async (clientId: string, val: string) => {
         try {
             if (val === "unassigned") {
-                // Backend doesn't support unassign yet, so we'll skip for now
-                toast.info("Unassign feature coming soon");
+                await unassignClient(clientId);
             } else {
                 await assignClientToAdmin(clientId, val);
             }

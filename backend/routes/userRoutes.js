@@ -9,6 +9,7 @@ const {
   updateUserStatus,
   deleteUser,
   getAdminUtilization,
+  getServerStats,
 } = require('../controllers/userController');
 const { protect } = require('../middleware/authMiddleware');
 const checkRole = require('../middleware/roleCheckMiddleware');
@@ -18,22 +19,21 @@ const {
   updateUserStatusSchema,
 } = require('../validators/userValidator');
 
-// All routes require authentication and SUPER_ADMIN role
+// All routes require authentication
 router.use(protect);
-router.use(checkRole('SUPER_ADMIN'));
 
 // Admin-specific routes (MUST come before generic /:id routes)
-router.get('/admins', getAllAdmins);
-router.post('/admins', validateRequest(createAdminSchema), createAdmin);
-router.get('/admins/:id', getUserById); // ✅ ADDED
-router.get('/admins/:id/utilization', getAdminUtilization);
-router.patch('/admins/:id/status', validateRequest(updateUserStatusSchema), updateUserStatus); // ✅ ADDED
-router.delete('/admins/:id', deleteUser); // ✅ ADDED
+router.get('/admins', checkRole('SUPER_ADMIN'), getAllAdmins);
+router.post('/admins', checkRole('SUPER_ADMIN'), validateRequest(createAdminSchema), createAdmin);
+router.get('/admins/:id', checkRole('SUPER_ADMIN'), getUserById);
+router.get('/admins/:id/utilization', checkRole('SUPER_ADMIN'), getAdminUtilization);
+router.patch('/admins/:id/status', checkRole('SUPER_ADMIN'), validateRequest(updateUserStatusSchema), updateUserStatus);
+router.delete('/admins/:id', checkRole('SUPER_ADMIN'), deleteUser);
+router.get('/servers/stats', checkRole('SUPER_ADMIN'), getServerStats);
 
 // General user routes
-router.get('/', getAllUsers);
-router.get('/:id', getUserById);
-router.patch('/:id/status', validateRequest(updateUserStatusSchema), updateUserStatus);
-router.delete('/:id', deleteUser);
-
+router.get('/', checkRole('SUPER_ADMIN', 'ADMIN'), getAllUsers);
+router.get('/:id', checkRole('SUPER_ADMIN', 'ADMIN'), getUserById);
+router.patch('/:id/status', checkRole('SUPER_ADMIN'), validateRequest(updateUserStatusSchema), updateUserStatus);
+router.delete('/:id', checkRole('SUPER_ADMIN'), deleteUser);
 module.exports = router;

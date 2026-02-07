@@ -59,20 +59,22 @@ export interface ClientFilters {
     status?: 'ACTIVE' | 'INACTIVE';
     assignedAdmin?: string | 'unassigned';
     search?: string;
+    company?: string;
 }
 
 export const clientService = {
     // Get all clients with optional filters
     async getAllClients(filters?: ClientFilters): Promise<{ clients: Client[]; message: string }> {
         const params = new URLSearchParams();
-        
+
         if (filters?.status) params.append('status', filters.status);
         if (filters?.assignedAdmin) params.append('assignedAdmin', filters.assignedAdmin);
         if (filters?.search) params.append('search', filters.search);
+        if (filters?.company) params.append('company', filters.company);
 
         const queryString = params.toString();
         const url = `/clients${queryString ? `?${queryString}` : ''}`;
-        
+
         const { data } = await api.get(url);
         return data;
     },
@@ -120,8 +122,9 @@ export const clientService = {
     },
 
     // Get client statistics
-    async getClientStats(): Promise<{ stats: ClientStats; message: string }> {
-        const { data } = await api.get('/clients/stats/overview');
+    async getClientStats(companyId?: string): Promise<{ stats: ClientStats; message: string }> {
+        const params = companyId ? { company: companyId } : {};
+        const { data } = await api.get('/clients/stats/overview', { params });
         return data;
     },
 };

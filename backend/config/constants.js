@@ -34,6 +34,22 @@ module.exports = {
     FILING_DONE: 'FILING_DONE',
   },
 
+  // Risk Levels
+  RISK_LEVELS: {
+    HIGH: 'HIGH',
+    MEDIUM: 'MEDIUM',
+    LOW: 'LOW',
+  },
+
+  // Departments (based on common compliance categories)
+  DEPARTMENTS: {
+    TAX: 'Direct Tax',
+    SECRETARIAL: 'Corporate Secretarial',
+    HR: 'HR / Labour Compliance',
+    ACCOUNTS: 'Accounts Department',
+    OTHER: 'Other',
+  },
+
   // Consultation Types
   CONSULTATION_TYPES: {
     CA: 'CA',

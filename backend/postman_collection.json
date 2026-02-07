@@ -1073,6 +1073,113 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Phase 2.4 - Compliances & Services",
+      "item": [
+        {
+          "name": "Compliances",
+          "item": [
+            {
+              "name": "List Compliances",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/compliances?company=",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "compliances"
+                  ],
+                  "query": [
+                    {
+                      "key": "company",
+                      "value": "",
+                      "description": "Filter by company ID"
+                    }
+                  ]
+                },
+                "description": "Get all compliances with optional company filtering"
+              },
+              "response": []
+            },
+            {
+              "name": "Get Compliance Stats",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/compliances/stats",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "compliances",
+                    "stats"
+                  ]
+                },
+                "description": "Get compliance statistics for the dashboard"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Services",
+          "item": [
+            {
+              "name": "List Services",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/services",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "services"
+                  ]
+                },
+                "description": "Get all marketplace services"
+              },
+              "response": []
+            },
+            {
+              "name": "Get Service by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/services/:id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "services",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "",
+                      "description": "Service ID"
+                    }
+                  ]
+                },
+                "description": "Get details of a specific service"
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [

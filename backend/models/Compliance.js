@@ -29,6 +29,22 @@ const ComplianceSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    risk: {
+        type: String,
+        enum: {
+            values: Object.values(constants.RISK_LEVELS),
+            message: '{VALUE} is not a valid risk level',
+        },
+        default: constants.RISK_LEVELS.LOW,
+    },
+    department: {
+        type: String,
+        enum: {
+            values: Object.values(constants.DEPARTMENTS),
+            message: '{VALUE} is not a valid department',
+        },
+        default: constants.DEPARTMENTS.OTHER,
+    },
 
     // Progress Tracking
     stage: {

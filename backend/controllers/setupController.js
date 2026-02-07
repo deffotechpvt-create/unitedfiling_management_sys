@@ -40,6 +40,7 @@ exports.setupSuperAdmin = asyncHandler(async (req, res) => {
         email: superAdmin.email,
         role: superAdmin.role,
       },
-    }, 'Super Admin created successfully')
+      message: 'Super Admin created successfully'
+    })
   );
 });

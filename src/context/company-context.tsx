@@ -15,7 +15,7 @@ interface CompanyContextType {
     error: string | null
 
     // Actions
-    setSelectedCompany: (company: Company) => void
+    setSelectedCompany: (company: Company | null) => void
     fetchCompanies: (filters?: CompanyFilters) => Promise<void>
     fetchStats: () => Promise<void>
     createCompany: (data: any) => Promise<Company | null>
@@ -90,8 +90,8 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-            const fetchedStats = await companyService.getStats()
-            setStats(fetchedStats)
+            const response = await companyService.getStats()
+            setStats(response.stats)
         } catch (err: any) {
             console.error('Failed to fetch stats:', err)
             // Don't show error toast for stats (non-critical)
@@ -104,20 +104,20 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     const createCompany = useCallback(async (data: any): Promise<Company | null> => {
         setLoading(true)
         try {
-            const newCompany = await companyService.createCompany(data)
+            const response = await companyService.createCompany(data)
 
             // Add to local state (optimistic update)
-            setCompanies(prev => [newCompany, ...prev])
+            setCompanies(prev => [response.company, ...prev])
 
             // Auto-select newly created company
-            setSelectedCompanyState(newCompany)
+            setSelectedCompanyState(response.company)
 
-            toast.success("Company created successfully!")
+            toast.success(response.message || "Company created successfully!")
 
             // Refresh stats
             fetchStats()
 
-            return newCompany
+            return response.company
         } catch (err: any) {
             const errorMsg = err?.response?.data?.message || "Failed to create company"
             toast.error(errorMsg)
@@ -133,19 +133,19 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     const updateCompany = useCallback(async (id: string, data: any): Promise<Company | null> => {
         setLoading(true)
         try {
-            const updatedCompany = await companyService.updateCompany(id, data)
+            const response = await companyService.updateCompany(id, data)
 
             // Update local state
-            setCompanies(prev => prev.map(c => c._id === id ? updatedCompany : c))
+            setCompanies(prev => prev.map(c => c._id === id ? response.company : c))
 
             // Update selected if it's the same company
             if (selectedCompany?._id === id) {
-                setSelectedCompanyState(updatedCompany)
+                setSelectedCompanyState(response.company)
             }
 
-            toast.success("Company updated successfully!")
+            toast.success(response.message || "Company updated successfully!")
 
-            return updatedCompany
+            return response.company
         } catch (err: any) {
             const errorMsg = err?.response?.data?.message || "Failed to update company"
             toast.error(errorMsg)
@@ -161,7 +161,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     const deleteCompany = useCallback(async (id: string): Promise<boolean> => {
         setLoading(true)
         try {
-            await companyService.deleteCompany(id)
+            const response = await companyService.deleteCompany(id)
 
             // Remove from local state
             setCompanies(prev => prev.filter(c => c._id !== id))
@@ -171,7 +171,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
                 setSelectedCompanyState(companies[0] || null)
             }
 
-            toast.success("Company deleted successfully!")
+            toast.success(response.message || "Company deleted successfully!")
 
             // Refresh stats
             fetchStats()
@@ -191,16 +191,16 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     // ========================================
     const addMember = useCallback(async (companyId: string, userId: string, role: 'OWNER' | 'EDITOR' | 'VIEWER'): Promise<boolean> => {
         try {
-            const updatedCompany = await companyService.addMember(companyId, { userId, role })
+            const response = await companyService.addMember(companyId, { userId, role })
 
             // Update local state
-            setCompanies(prev => prev.map(c => c._id === companyId ? updatedCompany : c))
+            setCompanies(prev => prev.map(c => c._id === companyId ? response.company : c))
 
             if (selectedCompany?._id === companyId) {
-                setSelectedCompanyState(updatedCompany)
+                setSelectedCompanyState(response.company)
             }
 
-            toast.success("Member added successfully!")
+            toast.success(response.message || "Member added successfully!")
             return true
         } catch (err: any) {
             const errorMsg = err?.response?.data?.message || "Failed to add member"
@@ -214,16 +214,16 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     // ========================================
     const removeMember = useCallback(async (companyId: string, userId: string): Promise<boolean> => {
         try {
-            const updatedCompany = await companyService.removeMember(companyId, userId)
+            const response = await companyService.removeMember(companyId, userId)
 
             // Update local state
-            setCompanies(prev => prev.map(c => c._id === companyId ? updatedCompany : c))
+            setCompanies(prev => prev.map(c => c._id === companyId ? response.company : c))
 
             if (selectedCompany?._id === companyId) {
-                setSelectedCompanyState(updatedCompany)
+                setSelectedCompanyState(response.company)
             }
 
-            toast.success("Member removed successfully!")
+            toast.success(response.message || "Member removed successfully!")
             return true
         } catch (err: any) {
             const errorMsg = err?.response?.data?.message || "Failed to remove member"
@@ -237,16 +237,16 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     // ========================================
     const updateMemberRole = useCallback(async (companyId: string, userId: string, role: 'OWNER' | 'EDITOR' | 'VIEWER'): Promise<boolean> => {
         try {
-            const updatedCompany = await companyService.updateMemberRole(companyId, userId, { role })
+            const response = await companyService.updateMemberRole(companyId, userId, { role })
 
             // Update local state
-            setCompanies(prev => prev.map(c => c._id === companyId ? updatedCompany : c))
+            setCompanies(prev => prev.map(c => c._id === companyId ? response.company : c))
 
             if (selectedCompany?._id === companyId) {
-                setSelectedCompanyState(updatedCompany)
+                setSelectedCompanyState(response.company)
             }
 
-            toast.success("Member role updated successfully!")
+            toast.success(response.message || "Member role updated successfully!")
             return true
         } catch (err: any) {
             const errorMsg = err?.response?.data?.message || "Failed to update member role"
@@ -266,10 +266,14 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     // ========================================
     // Custom setSelectedCompany with validation
     // ========================================
-    const setSelectedCompany = useCallback((company: Company) => {
+    const setSelectedCompany = useCallback((company: Company | null) => {
         setSelectedCompanyState(company)
         // Optionally store in localStorage for persistence
-        localStorage.setItem('selectedCompanyId', company._id)
+        if (company) {
+            localStorage.setItem('selectedCompanyId', company._id)
+        } else {
+            localStorage.removeItem('selectedCompanyId')
+        }
     }, [])
 
     // ========================================

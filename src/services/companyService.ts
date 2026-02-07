@@ -20,9 +20,9 @@ class CompanyService {
      * Get company statistics
      * Access: SUPER_ADMIN, ADMIN
      */
-    async getStats(): Promise<CompanyStats> {
+    async getStats(): Promise<{ stats: CompanyStats; message: string }> {
         const response = await api.get(`${this.baseUrl}/stats/overview`);
-        return response.data.stats;
+        return response.data;
     }
 
     /**
@@ -32,27 +32,24 @@ class CompanyService {
      * - ADMIN: sees companies of assigned clients
      * - USER: sees companies where they are members
      */
-    async getAllCompanies(filters?: CompanyFilters): Promise<{ companies: Company[]; count: number }> {
+    async getAllCompanies(filters?: CompanyFilters): Promise<{ companies: Company[]; count: number; message: string }> {
         const params = new URLSearchParams();
-        
+
         if (filters?.status) params.append('status', filters.status);
         if (filters?.client) params.append('client', filters.client);
         if (filters?.search) params.append('search', filters.search);
 
         const response = await api.get(`${this.baseUrl}?${params.toString()}`);
-        return {
-            companies: response.data.companies,
-            count: response.data.count,
-        };
+        return response.data;
     }
 
     /**
      * Get company by ID
      * Access: SUPER_ADMIN (all), ADMIN (assigned clients), USER (members only)
      */
-    async getCompanyById(id: string): Promise<Company> {
+    async getCompanyById(id: string): Promise<{ company: Company; message: string }> {
         const response = await api.get(`${this.baseUrl}/${id}`);
-        return response.data.company;
+        return response.data;
     }
 
     /**
@@ -62,35 +59,36 @@ class CompanyService {
      * - ADMIN: only assigned clients
      * - USER: auto-added as OWNER
      */
-    async createCompany(data: CreateCompanyData): Promise<Company> {
+    async createCompany(data: CreateCompanyData): Promise<{ company: Company; message: string }> {
         const response = await api.post(this.baseUrl, data);
-        return response.data.company;
+        return response.data;
     }
 
     /**
      * Update company
      * Access: SUPER_ADMIN (all + status), ADMIN (assigned clients), USER (OWNER only)
      */
-    async updateCompany(id: string, data: UpdateCompanyData): Promise<Company> {
+    async updateCompany(id: string, data: UpdateCompanyData): Promise<{ company: Company; message: string }> {
         const response = await api.put(`${this.baseUrl}/${id}`, data);
-        return response.data.company;
+        return response.data;
     }
 
     /**
      * Delete company
      * Access: SUPER_ADMIN only
      */
-    async deleteCompany(id: string): Promise<void> {
-        await api.delete(`${this.baseUrl}/${id}`);
+    async deleteCompany(id: string): Promise<{ message: string }> {
+        const response = await api.delete(`${this.baseUrl}/${id}`);
+        return response.data;
     }
 
     /**
      * Add member to company
      * Access: SUPER_ADMIN, ADMIN, USER (OWNER)
      */
-    async addMember(companyId: string, data: AddMemberData): Promise<Company> {
+    async addMember(companyId: string, data: AddMemberData): Promise<{ company: Company; message: string }> {
         const response = await api.post(`${this.baseUrl}/${companyId}/members`, data);
-        return response.data.company;
+        return response.data;
     }
 
     /**
@@ -98,9 +96,9 @@ class CompanyService {
      * Access: SUPER_ADMIN, ADMIN, USER (OWNER)
      * Note: Cannot remove last OWNER
      */
-    async removeMember(companyId: string, userId: string): Promise<Company> {
+    async removeMember(companyId: string, userId: string): Promise<{ company: Company; message: string }> {
         const response = await api.delete(`${this.baseUrl}/${companyId}/members/${userId}`);
-        return response.data.company;
+        return response.data;
     }
 
     /**
@@ -108,9 +106,9 @@ class CompanyService {
      * Access: SUPER_ADMIN, ADMIN, USER (OWNER)
      * Note: Cannot downgrade last OWNER
      */
-    async updateMemberRole(companyId: string, userId: string, data: UpdateMemberRoleData): Promise<Company> {
+    async updateMemberRole(companyId: string, userId: string, data: UpdateMemberRoleData): Promise<{ company: Company; message: string }> {
         const response = await api.patch(`${this.baseUrl}/${companyId}/members/${userId}/role`, data);
-        return response.data.company;
+        return response.data;
     }
 }
 

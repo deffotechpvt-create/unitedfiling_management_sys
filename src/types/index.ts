@@ -18,7 +18,7 @@ export interface Client {
 }
 
 export interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
   phone?: string;
@@ -92,89 +92,90 @@ export interface Document {
 // ========================================
 
 export interface Address {
-    street?: string;
-    city?: string;
-    state?: string;
-    pincode?: string;
-    country?: string;
+  street?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country?: string;
 }
 
 export interface CompanyMember {
-    _id?: string;
-    user: {
-        _id: string;
-        name: string;
-        email: string;
-        role: string;
-    } | string;
-    role: 'OWNER' | 'EDITOR' | 'VIEWER';
-    addedAt?: Date;
+  _id?: string;
+  user: {
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+  } | string;
+  role: 'OWNER' | 'EDITOR' | 'VIEWER';
+  addedAt?: Date;
 }
 
 export interface Company {
+  _id: string;
+  name: string;
+  registrationNumber?: string;
+  email?: string;
+  phone?: string;
+  address?: Address;
+  client: {
     _id: string;
     name: string;
-    registrationNumber?: string;
-    email?: string;
+    companyName?: string;
+    email: string;
     phone?: string;
-    address?: Address;
-    client: {
-        _id: string;
-        name: string;
-        companyName?: string;
-        email: string;
-        phone?: string;
-        status: string;
-    } | string;
-    members: CompanyMember[];
-    status: 'ACTIVE' | 'INACTIVE';
-    createdAt: string;
-    updatedAt: string;
-    memberCount?: number;
-    fullAddress?: string;
+    status: string;
+  } | string;
+  members: CompanyMember[];
+  status: 'ACTIVE' | 'INACTIVE';
+  createdAt: string;
+  updatedAt: string;
+  industry?: string;
+  memberCount?: number;
+  fullAddress?: string;
 }
 
 export interface CompanyStats {
-    totalCompanies: number;
-    activeCompanies: number;
-    inactiveCompanies: number;
-    companiesWithMembers: number;
-    companiesWithoutMembers: number;
+  totalCompanies: number;
+  activeCompanies: number;
+  inactiveCompanies: number;
+  companiesWithMembers: number;
+  companiesWithoutMembers: number;
 }
 
 export interface CompanyFilters {
-    status?: 'ACTIVE' | 'INACTIVE';
-    client?: string;
-    search?: string;
+  status?: 'ACTIVE' | 'INACTIVE';
+  client?: string;
+  search?: string;
 }
 
 export interface CreateCompanyData {
-    name: string;
-    registrationNumber?: string;
-    email?: string;
-    phone?: string;
-    address?: Address;
-    client: string;
-    members?: {
-        user: string;
-        role: 'OWNER' | 'EDITOR' | 'VIEWER';
-    }[];
+  name: string;
+  registrationNumber?: string;
+  email?: string;
+  phone?: string;
+  address?: Address;
+  client: string;
+  members?: {
+    user: string;
+    role: 'OWNER' | 'EDITOR' | 'VIEWER';
+  }[];
 }
 
 export interface UpdateCompanyData {
-    name?: string;
-    registrationNumber?: string;
-    email?: string;
-    phone?: string;
-    address?: Address;
-    status?: 'ACTIVE' | 'INACTIVE';
+  name?: string;
+  registrationNumber?: string;
+  email?: string;
+  phone?: string;
+  address?: Address;
+  status?: 'ACTIVE' | 'INACTIVE';
 }
 
 export interface AddMemberData {
-    userId: string;
-    role: 'OWNER' | 'EDITOR' | 'VIEWER';
+  userId: string;
+  role: 'OWNER' | 'EDITOR' | 'VIEWER';
 }
 
 export interface UpdateMemberRoleData {
-    role: 'OWNER' | 'EDITOR' | 'VIEWER';
+  role: 'OWNER' | 'EDITOR' | 'VIEWER';
 }

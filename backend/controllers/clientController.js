@@ -11,31 +11,48 @@ const constants = require('../config/constants');
  * @access  Private (SUPER_ADMIN, ADMIN)
  */
 const getAllClients = asyncHandler(async (req, res) => {
-    const { status, assignedAdmin, search } = req.query;
-
-    // Build query
+    // Build query with Role-based scoping
+    const { role, _id: userId } = req.user;
+    const { status, assignedAdmin, company, search } = req.query;
     let query = {};
 
-    // Filter by status
-    if (status) {
-        query.status = status;
-    }
-
-    // Filter by assigned admin
-    if (assignedAdmin) {
-        if (assignedAdmin === 'unassigned') {
-            query.assignedAdmin = null;
-        } else {
-            query.assignedAdmin = assignedAdmin;
+    if (role === constants.ROLES.SUPER_ADMIN) {
+        // SUPER_ADMIN sees all.
+        if (assignedAdmin) {
+            query.assignedAdmin = assignedAdmin === 'unassigned' ? null : assignedAdmin;
         }
+    } else if (role === constants.ROLES.ADMIN) {
+        // ADMIN sees their assigned clients.
+        const myClients = await Client.find({ assignedAdmin: userId }).select('_id companies');
+        const myClientIds = myClients.map(c => c._id);
+
+        if (company) {
+            const authorizedCompanies = myClients.flatMap(c => c.companies.map(id => id.toString()));
+            if (!authorizedCompanies.includes(company)) {
+                throw new ApiError(403, 'You do not have access to this company');
+            }
+        }
+        query._id = { $in: myClientIds };
+    } else if (role === constants.ROLES.USER) {
+        // USER sees clients linked to companies they are members of
+        const CompanyModel = require('../models/Company');
+        const myCompanies = await CompanyModel.find({ 'members.user': userId }).select('_id client');
+        const myCompanyIds = myCompanies.map(c => c._id.toString());
+        const myClientIds = [...new Set(myCompanies.map(c => c.client.toString()))];
+
+        if (company) {
+            if (!myCompanyIds.includes(company)) {
+                throw new ApiError(403, 'You do not have access to this company');
+            }
+        }
+        query._id = { $in: myClientIds };
     }
 
-    // If user is ADMIN, only show their clients
-    if (req.user.role === constants.ROLES.ADMIN) {
-        query.assignedAdmin = req.user._id;
-    }
+    // Apply general filters (Status, Company, Search) on top of scoped query
+    if (status) query.status = status;
+    if (company) query.companies = company;
 
-    // Search by name, company, email, phone
+    // Search by name, company, email, phone (applied on top of scoped query)
     if (search) {
         query.$or = [
             { name: { $regex: search, $options: 'i' } },
@@ -53,6 +70,7 @@ const getAllClients = asyncHandler(async (req, res) => {
     res.status(200).json(
         new ApiResponse(200, {
             clients,
+            count: clients.length,
             message: 'Clients retrieved successfully'
         })
     );
@@ -325,11 +343,38 @@ const getUnassignedClients = asyncHandler(async (req, res) => {
  * @access  Private (SUPER_ADMIN, ADMIN)
  */
 const getClientStats = asyncHandler(async (req, res) => {
+    const { role, _id: userId } = req.user;
+    const { company } = req.query;
     let query = {};
 
-    // If ADMIN, only their clients
-    if (req.user.role === constants.ROLES.ADMIN) {
-        query.assignedAdmin = req.user._id;
+    // Role-based filtering for stats
+    if (role === constants.ROLES.SUPER_ADMIN) {
+        if (company) query.companies = company;
+    } else if (role === constants.ROLES.ADMIN) {
+        const myClients = await Client.find({ assignedAdmin: userId }).select('_id companies');
+        const myClientIds = myClients.map(c => c._id);
+
+        if (company) {
+            const authorizedCompanies = myClients.flatMap(c => c.companies.map(id => id.toString()));
+            if (!authorizedCompanies.includes(company)) {
+                throw new ApiError(403, 'You do not have access to this company');
+            }
+            query.companies = company;
+        }
+        query._id = { $in: myClientIds };
+    } else if (role === constants.ROLES.USER) {
+        const CompanyModel = require('../models/Company');
+        const myCompanies = await CompanyModel.find({ 'members.user': userId }).select('_id client');
+        const myCompanyIds = myCompanies.map(c => c._id);
+        const myClientIds = [...new Set(myCompanies.map(c => c.client.toString()))];
+
+        if (company) {
+            if (!myCompanyIds.map(id => id.toString()).includes(company)) {
+                throw new ApiError(403, 'You do not have access to this company');
+            }
+            query.companies = company;
+        }
+        query._id = { $in: myClientIds };
     }
 
     const totalClients = await Client.countDocuments(query);
@@ -339,8 +384,8 @@ const getClientStats = asyncHandler(async (req, res) => {
 
     // Work statistics
     const clients = await Client.find(query);
-    const totalPendingWork = clients.reduce((sum, c) => sum + c.pendingWork, 0);
-    const totalCompletedWork = clients.reduce((sum, c) => sum + c.completedWork, 0);
+    const totalPendingWork = clients.reduce((sum, c) => sum + (c.pendingWork || 0), 0);
+    const totalCompletedWork = clients.reduce((sum, c) => sum + (c.completedWork || 0), 0);
 
     res.status(200).json(
         new ApiResponse(200, {

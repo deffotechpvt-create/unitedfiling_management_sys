@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { useClient } from "@/context/client-context";
+import { useCompany } from "@/context/company-context";
+import { useCompliance } from "@/context/compliance-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,13 +25,7 @@ function AdminDashboard({ role, userId }: { role: string; userId: string }) {
   const { clients, stats, loading, getAllClients } = useClient();
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
 
-  // Load admin's clients on mount (ONLY for ADMIN role)
-  useEffect(() => {
-    if (role === "ADMIN") {
-      getAllClients();
-    }
-  }, [role]);
-
+  // Load admin's clients is now handled reactively by ClientContext via selectedCompany
 
   // Filter clients by status
   const filteredClients = clients.filter((client) => {
@@ -275,57 +271,162 @@ function AdminDashboard({ role, userId }: { role: string; userId: string }) {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
 
-      {/* Additional Stats (Optional) */}
-      {clients.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500">Average Progress</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {Math.round(
-                  clients.reduce((sum, c) => {
-                    const total = c.pendingWork + c.completedWork;
-                    return sum + (total > 0 ? (c.completedWork / total) * 100 : 0);
-                  }, 0) / clients.length
-                )}%
-              </div>
-              <p className="text-xs text-slate-500 mt-1">Across all clients</p>
-            </CardContent>
-          </Card>
+// User Dashboard Component - Shows THEIR companies and compliance stats
+function UserDashboard() {
+  const { companies, loading: companiesLoading } = useCompany();
+  const { stats: complianceStats, loading: statsLoading, fetchStats } = useCompliance();
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500">Total Work</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {kpiStats.totalPendingWork + kpiStats.totalCompletedWork}
-              </div>
-              <p className="text-xs text-slate-500 mt-1">Combined tasks</p>
-            </CardContent>
-          </Card>
+  // fetchStats is now handled reactively by ComplianceContext via selectedCompany
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500">Completion Rate</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {kpiStats.totalPendingWork + kpiStats.totalCompletedWork > 0
-                  ? Math.round(
-                    (kpiStats.totalCompletedWork /
-                      (kpiStats.totalPendingWork + kpiStats.totalCompletedWork)) * 100
-                  )
-                  : 0}%
-              </div>
-              <p className="text-xs text-slate-500 mt-1">Tasks completed</p>
-            </CardContent>
-          </Card>
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const loading = companiesLoading || statsLoading;
+
+  if (loading) {
+    return (
+      <div className="space-y-6 p-6">
+        <Skeleton className="h-10 w-full" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
         </div>
-      )}
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">My Dashboard</h1>
+          <p className="text-slate-500 mt-1">Manage your companies and compliance status</p>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              My Companies
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{companies.length}</div>
+            <p className="text-xs text-slate-500 mt-1">Registered businesses</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-orange-600" />
+              Pending Compliances
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{complianceStats?.pending || 0}</div>
+            <p className="text-xs text-slate-500 mt-1">Needs action</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              Delayed
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{complianceStats?.delayed || 0}</div>
+            <p className="text-xs text-slate-500 mt-1">Past due date</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              Completed
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{complianceStats?.completed || 0}</div>
+            <p className="text-xs text-slate-500 mt-1">Successfully filed</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Company List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-blue-600" />
+            My Companies
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {companies.length === 0 ? (
+            <div className="text-center py-12">
+              <Users className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-500">No companies found</p>
+              <p className="text-xs text-slate-400 mt-2">Add your first company to get started</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Company Name</TableHead>
+                  <TableHead>Registration Number</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Members</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {companies.map((company) => (
+                  <TableRow key={company._id} className="hover:bg-slate-50">
+                    <TableCell className="font-medium">{company.name}</TableCell>
+                    <TableCell>{company.registrationNumber}</TableCell>
+                    <TableCell>
+                      <Badge variant={company.status === "ACTIVE" ? "default" : "secondary"}>
+                        {company.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-xs text-slate-500">
+                        {company.address?.city}, {company.address?.state}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{company.memberCount} Members</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <button className="text-sm text-blue-600 hover:underline">View Details</button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -364,6 +465,11 @@ export default function DashboardPage() {
     return null; // Will redirect
   }
 
-  // ADMIN and USER see their dashboard with real backend data
-  return <AdminDashboard role={user.role} userId={user.id || user.id} />;
+  // ADMIN see their dashboard
+  if (user.role === "ADMIN") {
+    return <AdminDashboard role={user.role} userId={user.id || user.id} />;
+  }
+
+  // USER (Client) sees UserDashboard
+  return <UserDashboard />;
 }

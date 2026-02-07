@@ -1,6 +1,7 @@
 // src/services/userService.ts
 import api from '@/lib/api';
 import { User } from '@/types';
+import { get } from 'http';
 
 export interface AdminWithUtilization {
     id: string;
@@ -30,11 +31,25 @@ export interface CreateAdminData {
 export interface UpdateUserStatusData {
     status: 'ACTIVE' | 'INACTIVE';
 }
-
+interface ServerStats {
+    uptimeSeconds: number;
+    uptimeFormatted: string;
+    uptimePercentage: number;
+    serverStartTime: string;
+}
 export const userService = {
+    async getServerStats(): Promise<ServerStats> {
+        const { data } = await api.get('/users/servers/stats');
+        return data.serverData;
+
+        // OR if your API returns { success: true, serverdata: {...} }
+        // return data.serverdata;
+    },
+
     // Get all admins with utilization
-    async getAllAdmins(): Promise<{ admins: AdminWithUtilization[]; count: number }> {
-        const { data } = await api.get('/users/admins');
+    async getAllAdmins(companyId?: string): Promise<{ admins: AdminWithUtilization[]; count: number; message: string }> {
+        const params = companyId ? { company: companyId } : {};
+        const { data } = await api.get('/users/admins', { params });
         return data;
     },
 
@@ -51,7 +66,7 @@ export const userService = {
     },
 
     // Get admin utilization details
-    async getAdminUtilization(adminId: string): Promise<{
+    async getAdminUtilization(adminId: string, companyId?: string): Promise<{
         admin: { id: string; name: string; email: string; status: string };
         clientCount: number;
         maxClients: number;
@@ -62,7 +77,8 @@ export const userService = {
         totalCompletedWork: number;
         clients: any[];
     }> {
-        const { data } = await api.get(`/users/admins/${adminId}/utilization`);
+        const params = companyId ? { company: companyId } : {};
+        const { data } = await api.get(`/users/admins/${adminId}/utilization`, { params });
         return data;
     },
 
@@ -82,12 +98,8 @@ export const userService = {
     },
 
     // Get all users (with optional filters)
-    async getAllUsers(filters?: { role?: string; status?: string }): Promise<{ users: User[]; count: number }> {
-        const params = new URLSearchParams();
-        if (filters?.role) params.append('role', filters.role);
-        if (filters?.status) params.append('status', filters.status);
-
-        const { data } = await api.get(`/users?${params.toString()}`);
+    async getAllUsers(): Promise<{ users: User[]; count: number }> {
+        const { data } = await api.get(`/users`);
         return data;
     },
 

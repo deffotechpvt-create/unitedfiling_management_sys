@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, use } from "reac
 import { clientService, Client, ClientStats, CreateClientData, UpdateClientData, ClientFilters } from "@/services/clientService";
 import { toast } from "sonner";
 import { useAuth } from "./auth-context";
+import { useCompany } from "./company-context";
 
 interface ClientContextType {
     clients: Client[];
@@ -47,6 +48,24 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
     const [filters, setFilters] = useState<ClientFilters>({});
     const [initialized, setInitialized] = useState(false);
     const { user } = useAuth();
+    const { selectedCompany } = useCompany();
+
+    // ✅ DECOUPLED: Automatic company sync removed. 
+    // Filtering is now handled manually by specific pages (Manage Clients) 
+    // to keep Dashboards global for ADMIN/SUPER_ADMIN.
+    /*
+    useEffect(() => {
+        if (selectedCompany?._id) {
+            setFilters(prev => ({ ...prev, company: selectedCompany._id }));
+        } else {
+            setFilters(prev => {
+                const newFilters = { ...prev };
+                delete newFilters.company;
+                return newFilters;
+            });
+        }
+    }, [selectedCompany?._id]);
+    */
 
     // Load clients on mount and when filters change
     useEffect(() => {
@@ -63,6 +82,7 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (initialized && (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN")) {
             getAllClients(filters);
+            getClientStats(); // Also refresh stats when filters change (company)
         }
     }, [filters]);
 
@@ -266,7 +286,7 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
         try {
             setError(null);
 
-            const response = await clientService.getClientStats();
+            const response = await clientService.getClientStats(filters.company);
 
             if (response.stats) {
                 setStats(response.stats);

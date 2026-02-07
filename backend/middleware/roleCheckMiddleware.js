@@ -12,11 +12,12 @@ const checkRole = (...roles) => {
     }
 
     const userRole = req.user.role;
+    const allowedRoles = roles.flat();
 
-    if (!roles.includes(userRole)) {
+    if (!allowedRoles.includes(userRole)) {
       return next(new ApiError(
         403,
-        `Access denied. Required roles: ${roles.join(',')}. Your role: ${userRole}`
+        `Access denied. Required roles: ${allowedRoles.join(',')}. Your role: ${userRole}`
       ));
     }
 

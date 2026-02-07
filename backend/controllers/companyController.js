@@ -264,7 +264,7 @@ exports.deleteCompany = asyncHandler(async (req, res) => {
     await company.deleteOne();
 
     return res.status(200).json(
-        new ApiResponse(200, 'Company deleted successfully')
+        new ApiResponse(200, { message: 'Company deleted successfully' })
     );
 });
 

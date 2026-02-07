@@ -1,123 +1,219 @@
-"use client"
+"use client";
 
-import { useAuth } from "@/context/auth-context"
-import { useSuperAdmin } from "@/context/super-admin-context"
-import { Button } from "@/components/ui/button"
+import { useSuperAdmin } from "@/context/super-admin-context";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ShieldAlert, UserCheck, UserMinus, Plus } from "lucide-react"
+    ShieldAlert,
+    UserCheck,
+    Users,
+    Activity,
+    TrendingUp,
+    AlertCircle,
+    Clock
+} from "lucide-react";
 
 export default function SuperAdminDashboard() {
-    const { admins, clients } = useSuperAdmin()
+    const { admins = [], clients = [], serverStats } = useSuperAdmin();
 
     // Calculate Global Stats
-    const totalAdmins = admins.length
-    const activeAdmins = admins.filter(a => a.status === "ACTIVE").length
-    const totalClients = clients.length
-    const activeClients = clients.filter(c => c.status === "ACTIVE").length
-    const totalPendingWork = clients.reduce((acc, curr) => acc + curr.pendingWork, 0)
+    const totalAdmins = admins.length;
+    const activeAdmins = admins.filter((a: any) => a.status === "ACTIVE").length;
+    const totalClients = clients.length;
+    const totalPendingWork = clients.reduce((acc: number, curr: any) => acc + (curr.pendingWork || 0), 0);
+
+    // Calculate Platform Health
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const newClientsThisMonth = clients.filter((c: any) => {
+        const joinedDate = new Date(c.joinedDate || 0);
+        return joinedDate >= firstDayOfMonth;
+    }).length;
+
+    const avgAdminUtilization = admins.length > 0
+        ? Math.round(admins.reduce((acc: number, curr: any) => acc + (curr.utilizationPercentage || 0), 0) / admins.length)
+        : 0;
 
     const stats = [
-        { title: "Total Clients", value: totalClients, icon: UserCheck, color: "text-blue-600", bg: "bg-blue-50" },
-        { title: "Active Admins", value: activeAdmins, subValue: `of ${totalAdmins} Total`, icon: ShieldAlert, color: "text-green-600", bg: "bg-green-50" },
-        { title: "Pending Actions Global", value: totalPendingWork, icon: ShieldAlert, color: "text-orange-600", bg: "bg-orange-50" },
-    ]
+        {
+            title: "Total Clients",
+            value: totalClients,
+            icon: Users,
+            color: "text-blue-600",
+            bg: "bg-blue-50",
+            trend: `+${newClientsThisMonth} this month`
+        },
+        {
+            title: "Active Admins",
+            value: activeAdmins,
+            subValue: `of ${totalAdmins} Total`,
+            icon: ShieldAlert,
+            color: "text-green-600",
+            bg: "bg-green-50"
+        },
+        {
+            title: "Pending Actions",
+            value: totalPendingWork,
+            icon: AlertCircle,
+            color: "text-orange-600",
+            bg: "bg-orange-50",
+            trend: totalPendingWork > 50 ? "High workload" : "Normal"
+        },
+    ];
 
     return (
-        <div className="space-y-8 p-6">
+        <div className="space-y-8">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Global Dashboard</h1>
-                    <p className="text-slate-500">Overview of platform performance and resource allocation.</p>
+                    <p className="text-slate-500 mt-1">Platform performance and resource allocation overview</p>
                 </div>
+                {serverStats && (
+                    <Badge variant="outline" className="gap-2 px-3 py-1.5">
+                        <Activity className="h-3.5 w-3.5 text-green-500" />
+                        <span className="text-xs font-medium">Server Online: {serverStats.uptimeFormatted}</span>
+                    </Badge>
+                )}
             </div>
 
-            {/* KPI Cards */}
+            {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {stats.map((stat, i) => (
-                    <Card key={i}>
-                        <CardContent className="p-6 flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-slate-500">{stat.title}</p>
-                                <div className="flex items-end gap-2 mt-1">
-                                    <h3 className="text-2xl font-bold text-slate-900">{stat.value}</h3>
-                                    {stat.subValue && <span className="text-xs text-slate-400 mb-1">{stat.subValue}</span>}
+                    <Card key={i} className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-2">
+                                    <p className="text-sm font-medium text-slate-500">{stat.title}</p>
+                                    <div className="flex items-baseline gap-2">
+                                        <h3 className="text-3xl font-bold text-slate-900">{stat.value}</h3>
+                                        {stat.subValue && (
+                                            <span className="text-xs text-slate-400">{stat.subValue}</span>
+                                        )}
+                                    </div>
+                                    {stat.trend && (
+                                        <p className="text-xs text-slate-500 flex items-center gap-1">
+                                            <TrendingUp className="h-3 w-3" />
+                                            {stat.trend}
+                                        </p>
+                                    )}
                                 </div>
-                            </div>
-                            <div className={`p-3 rounded-lg ${stat.bg}`}>
-                                <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                                <div className={`p-4 rounded-xl ${stat.bg}`}>
+                                    <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
                 ))}
             </div>
 
-            {/* Recent Activity / Simplified View */}
+            {/* Platform Health & Admin Capacity */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Platform Health</CardTitle>
+                <Card className="border-slate-200 shadow-sm">
+                    <CardHeader className="border-b border-slate-100">
+                        <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                            <Activity className="h-5 w-5 text-blue-600" />
+                            Platform Health
+                        </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-2">
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                                <span className="text-sm font-medium">Server Uptime</span>
-                                <span className="text-sm text-green-600 font-bold">99.9%</span>
+                            {/* Server Uptime */}
+                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                <div className="flex items-center gap-3">
+                                    <Clock className="h-4 w-4 text-green-600" />
+                                    <span className="text-sm font-medium text-slate-700">Server Uptime</span>
+                                </div>
+                                {serverStats ? (
+                                    <div className="text-right">
+                                        <span className="text-sm text-green-600 font-bold block">
+                                            {serverStats.uptimePercentage}%
+                                        </span>
+                                        <span className="text-xs text-slate-500">{serverStats.uptimeFormatted}</span>
+                                    </div>
+                                ) : (
+                                    <span className="text-xs text-slate-400">Loading...</span>
+                                )}
                             </div>
-                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                                <span className="text-sm font-medium">New Clients (This Month)</span>
-                                <span className="text-sm text-slate-900 font-bold">12</span>
+
+                            {/* New Clients This Month */}
+                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                <div className="flex items-center gap-3">
+                                    <UserCheck className="h-4 w-4 text-blue-600" />
+                                    <span className="text-sm font-medium text-slate-700">New Clients (This Month)</span>
+                                </div>
+                                <span className="text-sm text-slate-900 font-bold">{newClientsThisMonth}</span>
                             </div>
-                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                                <span className="text-sm font-medium">Admin Utilization</span>
-                                <span className="text-sm text-blue-600 font-bold">68%</span>
+
+                            {/* Admin Utilization */}
+                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                <div className="flex items-center gap-3">
+                                    <ShieldAlert className="h-4 w-4 text-purple-600" />
+                                    <span className="text-sm font-medium text-slate-700">Avg Admin Utilization</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-20 bg-slate-200 rounded-full h-2">
+                                        <div
+                                            className={`h-2 rounded-full ${avgAdminUtilization > 80 ? "bg-red-500" : "bg-blue-500"
+                                                }`}
+                                            style={{ width: `${avgAdminUtilization}%` }}
+                                        />
+                                    </div>
+                                    <span
+                                        className={`text-sm font-bold ${avgAdminUtilization > 80 ? "text-red-600" : "text-blue-600"
+                                            }`}
+                                    >
+                                        {avgAdminUtilization}%
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Admin Capacity Overview</CardTitle>
+                {/* Admin Capacity Overview */}
+                <Card className="border-slate-200 shadow-sm">
+                    <CardHeader className="border-b border-slate-100">
+                        <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                            <ShieldAlert className="h-5 w-5 text-purple-600" />
+                            Admin Capacity
+                        </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-2">
                         <div className="space-y-4">
-                            {admins.slice(0, 5).map(admin => (
-                                <div key={admin.id} className="space-y-1">
-                                    <div className="flex justify-between text-xs">
-                                        <span>{admin.name}</span>
-                                        <span className={admin.clientsAssigned >= admin.maxClients ? "text-red-500" : "text-slate-500"}>
-                                            {admin.clientsAssigned}/{admin.maxClients}
-                                        </span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 rounded-full h-1.5">
-                                        <div
-                                            className={`h-1.5 rounded-full ${admin.clientsAssigned >= admin.maxClients ? 'bg-red-500' : 'bg-blue-500'}`}
-                                            style={{ width: `${(admin.clientsAssigned / admin.maxClients) * 100}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
+                            {admins.length === 0 ? (
+                                <p className="text-sm text-slate-500 text-center py-8">No admins available</p>
+                            ) : (
+                                admins.slice(0, 5).map((admin: any) => {
+                                    const utilization = (admin.clientsAssigned / admin.maxClients) * 100;
+                                    const isAtCapacity = admin.clientsAssigned >= admin.maxClients;
+
+                                    return (
+                                        <div key={admin.id} className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm font-medium text-slate-700">{admin.name}</span>
+                                                <span
+                                                    className={`text-xs font-semibold ${isAtCapacity ? "text-red-600" : "text-slate-600"
+                                                        }`}
+                                                >
+                                                    {admin.clientsAssigned}/{admin.maxClients}
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                                <div
+                                                    className={`h-2 rounded-full transition-all ${isAtCapacity ? "bg-red-500" : "bg-blue-500"
+                                                        }`}
+                                                    style={{ width: `${utilization}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
                     </CardContent>
                 </Card>
             </div>
         </div>
-    )
+    );
 }

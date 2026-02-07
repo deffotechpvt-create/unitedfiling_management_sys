@@ -7,8 +7,9 @@ const userRoutes = require('./userRoutes');
 const clientRoutes = require('./clientRoutes');
 const companyRoutes = require('./companyRoutes');
 
-// In the routes section
-
+const complianceRoutes = require('./complianceRoutes');
+const serviceRoutes = require('./serviceRoutes');
+const reportRoutes = require('./reportRoutes');
 
 // Register route
 
@@ -17,6 +18,9 @@ router.use('/setup', setupRoutes);
 router.use('/users', userRoutes);
 router.use('/clients', clientRoutes);
 router.use('/companies', companyRoutes);
+router.use('/compliances', complianceRoutes);
+router.use('/services', serviceRoutes);
+router.use('/reports', reportRoutes);
 
 // Health check for API
 router.get('/health', (req, res) => {
