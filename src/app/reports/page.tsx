@@ -1,164 +1,152 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, Download, TrendingUp, ChevronLeft, Building2, User, Share, Share2, CornerUpRight, Gift, ChevronRight } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { FileText, Download, ChevronLeft, Gift, Loader2 } from "lucide-react"
+import { reportService, ReportStats, HighRiskCompliance } from "@/services/reportService"
+import { toast } from "sonner"
+import { useCompany } from "@/context/company-context"
 
 type ViewState = 'DASHBOARD' | 'HIGH_RISK'
 
 export default function ReportsPage() {
     const [view, setView] = useState<ViewState>('DASHBOARD')
+    const [stats, setStats] = useState<ReportStats | null>(null)
+    const [highRiskItems, setHighRiskItems] = useState<HighRiskCompliance[]>([])
+    const [loading, setLoading] = useState(true)
+    const { selectedCompany } = useCompany()
 
-    // --- MOCK DATA ---
-    const highRiskItems = [
-        {
-            compliance: "Employee State Insurance (ESI) Filings - August",
-            isNew: true,
-            office: "aachi - Arunachal Pradesh",
-            expert: "-",
-            dueDate: "15 Sep 2025",
-            stage: "Payment",
-            status: "Delayed"
-        },
-        {
-            compliance: "Preparation and Finalization of Board Meeting Minutes - July",
-            isNew: true,
-            office: "aachi - Arunachal Pradesh",
-            expert: "-",
-            dueDate: "30 Sep 2025",
-            stage: "Payment",
-            status: "Delayed"
-        },
-        {
-            compliance: "Payroll Processing & Salary Disbursement - September",
-            isNew: true,
-            office: "aachi - Arunachal Pradesh",
-            expert: "-",
-            dueDate: "30 Sep 2025",
-            stage: "Payment",
-            status: "Delayed"
-        },
-        {
-            compliance: "24Q TDS Challan Payment - September",
-            isNew: true,
-            office: "aachi - Arunachal Pradesh",
-            expert: "-",
-            dueDate: "07 Oct 2025",
-            stage: "Payment",
-            status: "Delayed"
-        },
-        {
-            compliance: "Employee State Insurance (ESI) Filings - September",
-            isNew: true,
-            office: "aachi - Arunachal Pradesh",
-            expert: "-",
-            dueDate: "15 Oct 2025",
-            stage: "Payment",
-            status: "Delayed"
-        },
-        {
-            compliance: "Payroll Processing & Salary Disbursement - October",
-            isNew: true,
-            office: "aachi - Arunachal Pradesh",
-            expert: "-",
-            dueDate: "31 Oct 2025",
-            stage: "Payment",
-            status: "Delayed"
-        },
-        {
-            compliance: "TDS Return Filing (Quarter 2) - October",
-            isNew: true,
-            office: "aachi - Arunachal Pradesh",
-            expert: "-",
-            dueDate: "31 Oct 2025",
-            stage: "Payment",
-            status: "Delayed"
+    const fetchData = useCallback(async () => {
+        try {
+            setLoading(true)
+            const [statsRes, highRiskRes] = await Promise.all([
+                reportService.getOverview(selectedCompany?._id),
+                reportService.getHighRiskCompliances(selectedCompany?._id)
+            ])
+            setStats(statsRes.stats)
+            setHighRiskItems(highRiskRes.compliances)
+        } catch (error: any) {
+            console.error("Error fetching reports:", error)
+            toast.error(error.response?.data?.message || "Failed to load report data")
+        } finally {
+            setLoading(false)
         }
-    ]
+    }, [selectedCompany?._id])
+
+    useEffect(() => {
+        fetchData()
+    }, [fetchData])
+
+    if (loading && !stats) {
+        return (
+            <div className="flex h-[80vh] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            </div>
+        )
+    }
 
     // --- COMPONENTS ---
 
     const DashboardView = () => (
         <div className="space-y-8 animate-in fade-in duration-500">
-            <h1 className="text-2xl font-bold text-slate-900">Reports</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Reports Overview</h1>
 
             <div className="grid md:grid-cols-2 gap-8">
                 {/* COLUMN 1 */}
                 <div className="space-y-8">
                     {/* By Risk */}
-                    <div className="space-y-3">
-                        <h3 className="text-lg font-medium text-slate-800">By Risk</h3>
-                        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                            <button
-                                onClick={() => setView('HIGH_RISK')}
-                                className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors border-b border-slate-100 text-left"
-                            >
-                                <FileText className="h-4 w-4 text-slate-400" />
-                                <span className="text-sm font-medium text-slate-700">High</span>
-                            </button>
-                            <div className="w-full flex items-center gap-3 p-4 border-b border-slate-100">
-                                <FileText className="h-4 w-4 text-slate-400" />
-                                <span className="text-sm font-medium text-slate-700">Medium</span>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg font-medium text-slate-800">By Risk</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="divide-y divide-slate-100">
+                                {['HIGH', 'MEDIUM', 'LOW'].map((risk) => {
+                                    const count = stats?.byRisk.find(r => r._id === risk)?.count || 0
+                                    return (
+                                        <button
+                                            key={risk}
+                                            onClick={() => risk === 'HIGH' && setView('HIGH_RISK')}
+                                            className={`w-full flex items-center justify-between p-4 transition-colors text-left ${risk === 'HIGH' ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <FileText className="h-4 w-4 text-slate-400" />
+                                                <span className="text-sm font-medium text-slate-700">{risk.charAt(0) + risk.slice(1).toLowerCase()}</span>
+                                            </div>
+                                            <span className="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">{count}</span>
+                                        </button>
+                                    )
+                                })}
                             </div>
-                            <div className="w-full flex items-center gap-3 p-4">
-                                <FileText className="h-4 w-4 text-slate-400" />
-                                <span className="text-sm font-medium text-slate-700">Low</span>
-                            </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
 
                     {/* By Stage */}
-                    <div className="space-y-3">
-                        <h3 className="text-lg font-medium text-slate-800">By Stage</h3>
-                        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                            {[
-                                "Payment",
-                                "Upload Documents",
-                                "Verifying Documents & Preparation",
-                                "Government Submission",
-                                "Filing Done"
-                            ].map((stage, idx) => (
-                                <div key={idx} className="w-full flex items-center gap-3 p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer">
-                                    <FileText className="h-4 w-4 text-slate-400" />
-                                    <span className="text-sm font-medium text-slate-700">{stage}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg font-medium text-slate-800">By Stage</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="divide-y divide-slate-100">
+                                {stats?.byStage.map((stage, idx) => (
+                                    <div key={idx} className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors cursor-pointer">
+                                        <div className="flex items-center gap-3">
+                                            <FileText className="h-4 w-4 text-slate-400" />
+                                            <span className="text-sm font-medium text-slate-700">{stage._id}</span>
+                                        </div>
+                                        <span className="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">{stage.count}</span>
+                                    </div>
+                                ))}
+                                {(!stats || stats.byStage.length === 0) && <div className="p-4 text-sm text-slate-400">No data available</div>}
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 {/* COLUMN 2 */}
                 <div className="space-y-8">
                     {/* By Organization */}
-                    <div className="space-y-3">
-                        <h3 className="text-lg font-medium text-slate-800">By Organization</h3>
-                        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                            <div className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors cursor-pointer">
-                                <FileText className="h-4 w-4 text-slate-400" />
-                                <span className="text-sm font-medium text-slate-700">aachi - Arunachal Pradesh</span>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg font-medium text-slate-800">By Organization</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="divide-y divide-slate-100">
+                                {stats?.byOrganization.map((org, idx) => (
+                                    <div key={idx} className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors cursor-pointer">
+                                        <div className="flex items-center gap-3">
+                                            <FileText className="h-4 w-4 text-slate-400" />
+                                            <span className="text-sm font-medium text-slate-700">{org.name}</span>
+                                        </div>
+                                        <span className="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">{org.count}</span>
+                                    </div>
+                                ))}
+                                {(!stats || stats.byOrganization.length === 0) && <div className="p-4 text-sm text-slate-400">No data available</div>}
                             </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
 
                     {/* By Department */}
-                    <div className="space-y-3">
-                        <h3 className="text-lg font-medium text-slate-800">By Department</h3>
-                        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                            {[
-                                "HR / Labour Compliance",
-                                "Direct Tax",
-                                "Corporate Secretarial",
-                                "Accounts Department"
-                            ].map((dept, idx) => (
-                                <div key={idx} className="w-full flex items-center gap-3 p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer">
-                                    <FileText className="h-4 w-4 text-slate-400" />
-                                    <span className="text-sm font-medium text-slate-700">{dept}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg font-medium text-slate-800">By Department</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="divide-y divide-slate-100">
+                                {stats?.byDepartment.map((dept, idx) => (
+                                    <div key={idx} className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors cursor-pointer">
+                                        <div className="flex items-center gap-3">
+                                            <FileText className="h-4 w-4 text-slate-400" />
+                                            <span className="text-sm font-medium text-slate-700">{dept._id}</span>
+                                        </div>
+                                        <span className="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">{dept.count}</span>
+                                    </div>
+                                ))}
+                                {(!stats || stats.byDepartment.length === 0) && <div className="p-4 text-sm text-slate-400">No data available</div>}
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </div>
@@ -191,7 +179,7 @@ export default function ReportsPage() {
 
             {/* Title Row */}
             <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-slate-900">Based on Risk - High <span className="text-slate-500 font-normal text-lg">(21)</span></h2>
+                <h2 className="text-xl font-bold text-slate-900">Based on Risk - High <span className="text-slate-500 font-normal text-lg">({highRiskItems.length})</span></h2>
                 <Button variant="ghost" size="icon">
                     <Download className="h-4 w-4 text-slate-500" />
                 </Button>
@@ -216,23 +204,33 @@ export default function ReportsPage() {
                                 <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-medium text-slate-700">{item.compliance}</span>
+                                            <span className="font-medium text-slate-700">{item.serviceType || 'General Compliance'}</span>
                                             {item.isNew && (
                                                 <span className="bg-orange-500 text-white text-[10px] font-bold px-1 rounded flex items-center justify-center w-4 h-4">M</span>
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-slate-500">{item.office}</td>
-                                    <td className="px-6 py-4 text-slate-500">{item.expert}</td>
-                                    <td className="px-6 py-4 text-slate-500">{item.dueDate}</td>
+                                    <td className="px-6 py-4 text-slate-500">{item.company?.name || 'Unknown'}</td>
+                                    <td className="px-6 py-4 text-slate-500">{item.expertName || '-'}</td>
+                                    <td className="px-6 py-4 text-slate-500">{new Date(item.dueDate).toLocaleDateString()}</td>
                                     <td className="px-6 py-4 text-slate-500">{item.stage}</td>
                                     <td className="px-6 py-4">
-                                        <span className="bg-pink-100 text-pink-700 px-3 py-1 rounded-md text-xs font-medium border border-pink-200">
+                                        <span className={`px-3 py-1 rounded-md text-xs font-medium border ${item.status === 'DELAYED' ? 'bg-pink-100 text-pink-700 border-pink-200' :
+                                            item.status === 'COMPLETED' ? 'bg-green-100 text-green-700 border-green-200' :
+                                                'bg-blue-100 text-blue-700 border-blue-200'
+                                            }`}>
                                             {item.status}
                                         </span>
                                     </td>
                                 </tr>
                             ))}
+                            {highRiskItems.length === 0 && (
+                                <tr>
+                                    <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
+                                        No high risk compliances found.
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>

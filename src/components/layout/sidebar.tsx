@@ -46,14 +46,16 @@ export function Sidebar() {
                 return [
                     { name: "Global Dashboard", href: "/", icon: LayoutDashboard },
                     { name: "Client List", href: "/super-admin/clients", icon: Building2 },
-                    { name: "Admin Management", href: "/super-admin/admins", icon: Users },
+                    { name: "Admin & User Management", href: "/super-admin/admins", icon: Users },
                     { name: "Documents", href: "/documents", icon: FileText },
                     { name: "Reports", href: "/reports", icon: FileText },
                     // { name: "Audit Logs", href: "/audit", icon: FileText },
                 ]
             case "ADMIN":
                 return [
-                    { name: "My Clients", href: "/", icon: Users },
+                    { name: "Dashboard", href: "/", icon: LayoutDashboard },
+                    { name: "Manage Clients", href: "/admin/clients", icon: Users },
+                    { name: "Manage Companies", href: "/admin/companies", icon: Building2 },
                     { name: "Tasks", href: "/compliances", icon: ShieldCheck }, // Reusing compliances for tasks
                     { name: "Calendar", href: "/calendar", icon: Calendar },
                     { name: "Documents", href: "/documents", icon: FileText },

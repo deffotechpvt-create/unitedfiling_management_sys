@@ -21,29 +21,38 @@ export function Header() {
     return (
         <header className="sticky top-0 z-10 flex h-16 w-full items-center justify-between border-b bg-white px-4 md:px-6 shadow-sm">
             <div className="flex items-center gap-4 ml-10 lg:ml-0">
-                {user?.role !== "USER" && (
-                    <div className="w-[180px] md:w-[240px]">
-                        <Select
-                            value={selectedCompany.id}
-                            onValueChange={(value) => {
-                                const company = companies.find((c) => c.id === value)
+                <div className="w-[180px] md:w-[240px]">
+                    <Select
+                        value={selectedCompany?._id || 'all'}
+                        onValueChange={(value) => {
+                            if (value === 'all') {
+                                setSelectedCompany(null as any) // handled in context
+                            } else {
+                                const company = companies.find((c) => c._id === value)
                                 if (company) setSelectedCompany(company)
-                            }}
-                        >
-                            <SelectTrigger className="w-full bg-slate-50 border-slate-200">
-                                <SelectValue placeholder="Select company" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {companies.map((company) => (
-                                    <SelectItem key={company.id} value={company.id}>
+                            }
+                        }}
+                    >
+                        <SelectTrigger className="w-full bg-slate-50 border-slate-200">
+                            <SelectValue placeholder="Select company" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">
+                                <span className="font-medium text-slate-900">
+                                    {user?.role === "SUPER_ADMIN" ? "All Companies" : "All My Companies"}
+                                </span>
+                            </SelectItem>
+                            {companies.map((company) => {
+                                return (
+                                    <SelectItem key={company._id} value={company._id}>
                                         <span className="font-medium text-slate-900">{company.name}</span>
-                                        <span className="ml-2 text-xs text-slate-500">({company.role})</span>
+                                        <span className="ml-2 text-xs text-slate-500">({company.members?.length || 0} members)</span>
                                     </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                )}
+                                )
+                            })}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             <div className="flex items-center gap-2 md:gap-4">

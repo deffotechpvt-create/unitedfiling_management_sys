@@ -1,9 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useState, useEffect } from "react"
 import { useCompany } from "@/context/company-context"
-import { fetchCompliances } from "@/lib/api"
+import { useCompliance } from "@/context/compliance-context"
 import { ComplianceTable } from "@/components/dashboard/compliance-table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
@@ -71,10 +70,11 @@ export function CompliancesPageClient() {
         "Accounts Department": ["Bookkeeping", "Auditing"]
     }
 
-    const { data: compliances = [], isLoading } = useQuery({
-        queryKey: ["compliances", selectedCompany.id],
-        queryFn: () => fetchCompliances(selectedCompany.id),
-    })
+    const { compliances, loading: isLoading, fetchCompliances } = useCompliance();
+
+    useEffect(() => {
+        fetchCompliances(selectedCompany?._id);
+    }, [selectedCompany?._id, fetchCompliances]);
 
     const handleDeptChange = (val: string) => {
         if (val === selectedDept) return;
@@ -127,35 +127,20 @@ export function CompliancesPageClient() {
 
     // Mock Data to match screenshot EXACTLY for now (since API is mock anyway)
     // Overriding the API data visually to match the user request perfect
-    const rows = [
-        {
-            id: 1,
-            name: "24Q TDS Challan Payment - January",
-            isMandatory: true,
-            office: "aachi - Arunachal Pradesh",
-            dueDate: "07 Feb 2026",
-            stage: "Payment",
-            status: "Pending"
-        },
-        {
-            id: 2,
-            name: "Employee State Insurance (ESI) Filings - January",
-            isMandatory: true,
-            office: "aachi - Arunachal Pradesh",
-            dueDate: "15 Feb 2026",
-            stage: "Payment",
-            status: "Pending"
-        },
-        {
-            id: 3,
-            name: "Payroll Processing & Salary Disbursement - February",
-            isMandatory: true,
-            office: "aachi - Arunachal Pradesh",
-            dueDate: "28 Feb 2026",
-            stage: "Payment",
-            status: "Pending"
-        }
-    ]
+    const rows = compliances.map((c: any) => ({
+        id: c.id,
+        name: c.serviceType,
+        isMandatory: true, // Assuming or could be added to model
+        office: c.company?.name || "N/A",
+        dueDate: new Date(c.dueDate).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric"
+        }),
+        stage: c.stage.charAt(0) + c.stage.slice(1).toLowerCase(),
+        status: c.status.charAt(0) + c.status.slice(1).toLowerCase(),
+        expertName: c.expertName
+    }))
 
     return (
         <div className="space-y-6 pb-20">
@@ -298,8 +283,8 @@ export function CompliancesPageClient() {
                             key={tab.name}
                             onClick={() => setActiveTab(tab.name)}
                             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.name
-                                    ? "border-slate-900 text-slate-900"
-                                    : "border-transparent text-slate-500 hover:text-slate-700"
+                                ? "border-slate-900 text-slate-900"
+                                : "border-transparent text-slate-500 hover:text-slate-700"
                                 }`}
                         >
                             {tab.name} <span className="text-xs text-slate-400 ml-1">({tab.count})</span>

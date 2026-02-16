@@ -27,9 +27,20 @@ exports.register = asyncHandler(async (req, res) => {
     phone,
     role: 'USER',
   });
+  const token = generateToken(user._id, user.role);
+  setTokenCookie(res, token);
 
   res.status(201).json(
-    new ApiResponse(201, 'User registered successfully')
+    new ApiResponse(201, {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+      },
+      message: 'User registered successfully'
+    })
   );
 });
 

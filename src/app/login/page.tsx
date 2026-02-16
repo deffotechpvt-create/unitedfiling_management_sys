@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/auth-context";
-import { ShieldCheck, User, ArrowRight, AlertCircle } from "lucide-react";
+import { ShieldCheck, User, ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { PasswordStrengthIndicator, validatePassword } from "@/components/ui/PasswordStrengthIndicator";
 
 export default function LoginPage() {
     const { login, register, loading, error } = useAuth();
@@ -15,10 +16,45 @@ export default function LoginPage() {
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
     const [formError, setFormError] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    const [phoneError, setPhoneError] = useState("");
+    const [phoneFlag, setPhoneFlag] = useState(false); // Local loading state for form submission
+    const handlePhoneChange = (value: string) => {
+        setPhone(value);
 
+        if (value) {
+            const cleanPhone = value.replace(/[\s\-+]/g, '');
+            const isValidPhone = /^[0-9]{10}$/.test(cleanPhone) || /^91[0-9]{10}$/.test(cleanPhone);
+            if (value.length < 10) {
+                setPhoneFlag(true);
+                setPhoneError("Phone number must be 10 digits");
+                return;
+            }
+            if (value.length > 0 && !isValidPhone && cleanPhone.length >= 10) {
+                setPhoneError("Phone must be 10 digits");
+                setPhoneFlag(true);
+                return;
+            } else {
+                setPhoneFlag(false);
+                setPhoneError("");
+            }
+        } else {
+            setPhoneFlag(false);
+            setPhoneError("");
+        }
+    };
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setFormError("");
+
+        // ✅ Validate password strength for signup
+        if (isSignUp) {
+            const validation = validatePassword(password);
+            if (!validation.isValid) {
+                setFormError("Password does not meet security requirements");
+                return;
+            }
+        }
 
         try {
             if (isSignUp) {
@@ -29,7 +65,6 @@ export default function LoginPage() {
                     password,
                     phone: phone || undefined,
                 });
-                // Success - user will be redirected to login by context
             } else {
                 // Login
                 await login({
@@ -42,6 +77,9 @@ export default function LoginPage() {
             setFormError(err.message);
         }
     };
+
+    // ✅ Check if password is valid (only for signup)
+    const isPasswordValid = isSignUp ? (password ? validatePassword(password).isValid : false) : true;
 
     return (
         <div className="w-full h-screen lg:grid lg:grid-cols-2">
@@ -121,18 +159,25 @@ export default function LoginPage() {
 
                         {isSignUp && (
                             <div className="grid gap-2">
-                                <Label htmlFor="phone">Phone (Optional)</Label>
+                                <Label htmlFor="phone">Phone</Label>
                                 <Input
                                     id="phone"
                                     type="tel"
                                     placeholder="9876543210"
                                     value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
+                                    onChange={(e) => handlePhoneChange(e.target.value)}
                                     disabled={loading}
+                                    maxLength={10}
+                                    className={phoneError ? "border-red-500" : ""}
                                 />
+                                {phoneError && (
+                                    <p className="text-xs text-red-600">{phoneError}</p>
+                                )}
+                                <p className="text-xs text-slate-500">Enter 10-digit mobile number</p>
                             </div>
                         )}
 
+                        {/* ✅ Password Field with Show/Hide Toggle and Strength Indicator */}
                         <div className="grid gap-2">
                             <div className="flex items-center justify-between">
                                 <Label htmlFor="password">Password</Label>
@@ -142,22 +187,45 @@ export default function LoginPage() {
                                     </a>
                                 )}
                             </div>
-                            <Input
-                                id="password"
-                                type="password"
-                                placeholder="••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                disabled={loading}
-                                minLength={6}
-                            />
-                            {isSignUp && (
-                                <p className="text-xs text-slate-500">Password must be at least 6 characters</p>
+
+                            {/* Password Input with Eye Toggle */}
+                            <div className="relative">
+                                <Input
+                                    id="password"
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="••••••••"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                    disabled={loading}
+                                    className="pr-10"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                                    disabled={loading}
+                                >
+                                    {showPassword ? (
+                                        <EyeOff className="h-4 w-4" />
+                                    ) : (
+                                        <Eye className="h-4 w-4" />
+                                    )}
+                                </button>
+                            </div>
+
+                            {/* ✅ Password Strength Indicator (Only for Sign Up) */}
+                            {isSignUp && password && (
+                                <PasswordStrengthIndicator password={password} compact={true} showRules={true} />
                             )}
                         </div>
 
-                        <Button className="w-full bg-slate-900 hover:bg-slate-800" type="submit" disabled={loading}>
+                        {/* ✅ Submit Button - Disabled if password invalid during signup */}
+                        <Button
+                            className="w-full bg-slate-900 hover:bg-slate-800"
+                            type="submit"
+                            disabled={loading || (isSignUp && !isPasswordValid) || phoneFlag}
+                        >
                             {loading ? (
                                 <span className="flex items-center">
                                     <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -226,7 +294,7 @@ export default function LoginPage() {
                             onClick={async () => {
                                 setFormError("");
                                 try {
-                                    await login({ email: "john@example.com", password: "password123" });
+                                    await login({ email: "deepak.rao@gmail.com", password: "User@123" });
                                 } catch (err: any) {
                                     setFormError(err.message);
                                 }
@@ -238,13 +306,13 @@ export default function LoginPage() {
                         </Button>
                     </div>
 
-
                     <div className="text-center text-sm text-slate-500 mt-4">
                         {isSignUp ? "Already have an account? " : "Don't have an account? "}
                         <button
                             onClick={() => {
                                 setIsSignUp(!isSignUp);
                                 setFormError("");
+                                setPassword(""); // Clear password when switching
                             }}
                             className="font-medium text-blue-600 hover:text-blue-500 hover:underline"
                             disabled={loading}

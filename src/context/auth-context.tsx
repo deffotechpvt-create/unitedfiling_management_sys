@@ -75,9 +75,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             const response = await authService.register(data);
 
-            if (response.success) {
-                // After registration, redirect to login
-                router.push("/login");
+            if (response.success && response.user) {
+                setUser(response.user);
+                router.push("/");
             } else {
                 throw new Error(response.message || "Registration failed");
             }

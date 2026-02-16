@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { fetchServices } from "@/lib/api"
+import { useState, useEffect } from "react"
+import { useService } from "@/context/service-context"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,46 +14,15 @@ import { Skeleton } from "@/components/ui/skeleton"
 const CATEGORIES = ["All", "Licenses", "Trademarks", "Company Changes", "Taxation"]
 
 export default function ServicesPage() {
-    const [selectedCategory, setSelectedCategory] = useState("All")
-    const [selectedService, setSelectedService] = useState<Service | null>(null)
+    const { services, loading: isLoading, fetchServices } = useService();
+    const [selectedCategory, setSelectedCategory] = useState("All");
+    const [selectedService, setSelectedService] = useState<Service | null>(null);
 
-    // In a real app, query would accept category
-    const { data: services, isLoading } = useQuery({
-        queryKey: ["services"],
-        queryFn: fetchServices
-    })
+    useEffect(() => {
+        fetchServices();
+    }, [fetchServices]);
 
-    // Mock expanding the services for demo purposes since api.ts only has 2
-    const displayServices = services ? [
-        ...services,
-        {
-            id: "s3",
-            title: "GST Registration",
-            description: "Get your GSTIN within 7 days.",
-            category: "Taxation",
-            price: "₹1,499",
-            benefits: ["Legal Compliance", "Input Tax Credit"],
-            processSteps: [{ title: "Docs", description: "Upload PAN/Aadhaar" }, { title: "Filing", description: "Submit to Portal" }]
-        },
-        {
-            id: "s4",
-            title: "Add Director",
-            description: "Appoint a new director to your company.",
-            category: "Company Changes",
-            price: "₹2,999",
-            benefits: ["Management Expansion", "Compliance"],
-            processSteps: [{ title: "DIN Application", description: "For new director" }, { title: "DIR-12", description: "File with ROC" }]
-        },
-        {
-            id: "s5",
-            title: "FSSAI License",
-            description: "Food license for your food business.",
-            category: "Licenses",
-            price: "₹3,999",
-            benefits: ["Legal Requirement", "Consumer Trust"],
-            processSteps: [{ title: "Application", description: "Form A/B" }, { title: "Inspection", description: "By Food Inspector" }]
-        }
-    ] : []
+    const displayServices = services;
 
     const filteredServices = selectedCategory === "All"
         ? displayServices
