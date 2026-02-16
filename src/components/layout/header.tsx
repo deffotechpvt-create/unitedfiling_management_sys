@@ -12,30 +12,44 @@ import { Bell, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
+import { useAuth } from "@/context/auth-context"
+
 export function Header() {
     const { selectedCompany, setSelectedCompany, companies } = useCompany()
+    const { user } = useAuth()
 
     return (
         <header className="sticky top-0 z-10 flex h-16 w-full items-center justify-between border-b bg-white px-4 md:px-6 shadow-sm">
             <div className="flex items-center gap-4 ml-10 lg:ml-0">
                 <div className="w-[180px] md:w-[240px]">
                     <Select
-                        value={selectedCompany.id}
+                        value={selectedCompany?._id || 'all'}
                         onValueChange={(value) => {
-                            const company = companies.find((c) => c.id === value)
-                            if (company) setSelectedCompany(company)
+                            if (value === 'all') {
+                                setSelectedCompany(null as any) // handled in context
+                            } else {
+                                const company = companies.find((c) => c._id === value)
+                                if (company) setSelectedCompany(company)
+                            }
                         }}
                     >
                         <SelectTrigger className="w-full bg-slate-50 border-slate-200">
                             <SelectValue placeholder="Select company" />
                         </SelectTrigger>
                         <SelectContent>
-                            {companies.map((company) => (
-                                <SelectItem key={company.id} value={company.id}>
-                                    <span className="font-medium text-slate-900">{company.name}</span>
-                                    <span className="ml-2 text-xs text-slate-500">({company.role})</span>
-                                </SelectItem>
-                            ))}
+                            <SelectItem value="all">
+                                <span className="font-medium text-slate-900">
+                                    {user?.role === "SUPER_ADMIN" ? "All Companies" : "All My Companies"}
+                                </span>
+                            </SelectItem>
+                            {companies.map((company) => {
+                                return (
+                                    <SelectItem key={company._id} value={company._id}>
+                                        <span className="font-medium text-slate-900">{company.name}</span>
+                                        <span className="ml-2 text-xs text-slate-500">({company.members?.length || 0} members)</span>
+                                    </SelectItem>
+                                )
+                            })}
                         </SelectContent>
                     </Select>
                 </div>

@@ -1,0 +1,1197 @@
+{
+  "info": {
+    "name": "United Fillings Backend API (Cookie Auth)",
+    "description": "Complete API collection with HTTP-only cookie authentication",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "united-fillings-backend"
+  },
+  "item": [
+    {
+      "name": "Phase 0 - Initial Setup",
+      "item": [
+        {
+          "name": "Setup Super Admin (One-Time)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Super Admin\",\n  \"email\": \"superadmin@unitedfillings.com\",\n  \"password\": \"SuperSecure123!\",\n  \"setupKey\": \"{{setupKey}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/setup/super-admin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "setup",
+                "super-admin"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Phase 1 - Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"password123\",\n  \"newPassword\": \"newpassword456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "change-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe Updated\",\n  \"phone\": \"9876543210\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Phase 2 - User Management",
+      "item": [
+        {
+          "name": "Admin Management",
+          "item": [
+            {
+              "name": "Get All Admins (with Utilization)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/admins",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "admins"
+                  ]
+                },
+                "description": "Get list of all admin users with their workload stats (SUPER_ADMIN only)"
+              },
+              "response": []
+            },
+            {
+              "name": "Create Admin User",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Admin User\",\n  \"email\": \"admin@unitedfillings.com\",\n  \"password\": \"admin123\",\n  \"phone\": \"9876543210\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/admins",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "admins"
+                  ]
+                },
+                "description": "Create a new admin user (SUPER_ADMIN only)"
+              },
+              "response": []
+            },
+            {
+              "name": "Get Admin by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/admins/:adminId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "admins",
+                    ":adminId"
+                  ],
+                  "variable": [
+                    {
+                      "key": "adminId",
+                      "value": "",
+                      "description": "Admin User ID"
+                    }
+                  ]
+                },
+                "description": "Get details of specific admin user (SUPER_ADMIN only)"
+              },
+              "response": []
+            },
+            {
+              "name": "Get Admin Utilization",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/admins/:adminId/utilization",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "admins",
+                    ":adminId",
+                    "utilization"
+                  ],
+                  "variable": [
+                    {
+                      "key": "adminId",
+                      "value": "",
+                      "description": "Admin User ID"
+                    }
+                  ]
+                },
+                "description": "Get detailed workload statistics for specific admin (SUPER_ADMIN only)"
+              },
+              "response": []
+            },
+            {
+              "name": "Update Admin Status",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"INACTIVE\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/admins/:adminId/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "admins",
+                    ":adminId",
+                    "status"
+                  ],
+                  "variable": [
+                    {
+                      "key": "adminId",
+                      "value": "",
+                      "description": "Admin User ID"
+                    }
+                  ]
+                },
+                "description": "Activate or deactivate an admin (SUPER_ADMIN only). Status: ACTIVE or INACTIVE"
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Admin",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/admins/:adminId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "admins",
+                    ":adminId"
+                  ],
+                  "variable": [
+                    {
+                      "key": "adminId",
+                      "value": "",
+                      "description": "Admin User ID"
+                    }
+                  ]
+                },
+                "description": "Delete admin user (SUPER_ADMIN only). Cannot delete if admin has assigned clients."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "General User Management",
+          "item": [
+            {
+              "name": "Get All Users",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users?role=USER&status=ACTIVE",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users"
+                  ],
+                  "query": [
+                    {
+                      "key": "role",
+                      "value": "USER",
+                      "description": "Filter by role: SUPER_ADMIN, ADMIN, or USER"
+                    },
+                    {
+                      "key": "status",
+                      "value": "ACTIVE",
+                      "description": "Filter by status: ACTIVE or INACTIVE"
+                    }
+                  ]
+                },
+                "description": "Get all users with optional filters (SUPER_ADMIN only)"
+              },
+              "response": []
+            },
+            {
+              "name": "Get User by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/:userId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    ":userId"
+                  ],
+                  "variable": [
+                    {
+                      "key": "userId",
+                      "value": "",
+                      "description": "User ID"
+                    }
+                  ]
+                },
+                "description": "Get details of any user by ID (SUPER_ADMIN only)"
+              },
+              "response": []
+            },
+            {
+              "name": "Update User Status",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"INACTIVE\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/:userId/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    ":userId",
+                    "status"
+                  ],
+                  "variable": [
+                    {
+                      "key": "userId",
+                      "value": "",
+                      "description": "User ID"
+                    }
+                  ]
+                },
+                "description": "Update status of any user (SUPER_ADMIN only). Status: ACTIVE or INACTIVE"
+              },
+              "response": []
+            },
+            {
+              "name": "Delete User",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/:userId",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    ":userId"
+                  ],
+                  "variable": [
+                    {
+                      "key": "userId",
+                      "value": "",
+                      "description": "User ID"
+                    }
+                  ]
+                },
+                "description": "Delete any user (SUPER_ADMIN only). Cannot delete SUPER_ADMIN or ADMIN with assigned clients."
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Phase 3 - Client Management",
+      "item": [
+        {
+          "name": "Get Client Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/stats/overview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "stats",
+                "overview"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Unassigned Clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/unassigned/list",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "unassigned",
+                "list"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List All Clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Clients (Filtered)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients?status=ACTIVE&search=client&assignedAdmin=unassigned",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "description": "ACTIVE or INACTIVE"
+                },
+                {
+                  "key": "search",
+                  "value": "client",
+                  "description": "Search by name, company, email, phone"
+                },
+                {
+                  "key": "assignedAdmin",
+                  "value": "unassigned",
+                  "description": "Filter by admin ID or 'unassigned'"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Client",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"companyName\": \"ABC Solutions Pvt Ltd\",\n  \"email\": \"john.doe@abcsolutions.com\",\n  \"phone\": \"9876543210\",\n  \"assignedAdmin\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Client by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/:clientId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                ":clientId"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": "",
+                  "description": "Client MongoDB ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Client",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe Updated\",\n  \"companyName\": \"ABC Solutions Ltd\",\n  \"email\": \"john.updated@abcsolutions.com\",\n  \"phone\": \"9876543210\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/:clientId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                ":clientId"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": "",
+                  "description": "Client MongoDB ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Client (SUPER_ADMIN only)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/:clientId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                ":clientId"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": "",
+                  "description": "Client MongoDB ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assign Client to Admin (SUPER_ADMIN only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"adminId\": \"admin_user_id_here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/:clientId/assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                ":clientId",
+                "assign"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": "",
+                  "description": "Client MongoDB ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unassign Client from Admin (SUPER_ADMIN only)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/:clientId/unassign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                ":clientId",
+                "unassign"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": "",
+                  "description": "Client MongoDB ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Phase 2.3 - Company Management",
+      "item": [
+        {
+          "name": "Get Company Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/companies/stats/overview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                "stats",
+                "overview"
+              ],
+              "query": []
+            },
+            "description": "Get company statistics (SUPER_ADMIN, ADMIN only)\n- Total companies\n- Active/Inactive counts\n- Companies with/without members"
+          },
+          "response": []
+        },
+        {
+          "name": "List Companies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/companies?status=ACTIVE&search=&client=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ACTIVE",
+                  "description": "Filter by status (ACTIVE, INACTIVE)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by name, registration number, or email"
+                },
+                {
+                  "key": "client",
+                  "value": "",
+                  "description": "Filter by client ID"
+                }
+              ]
+            },
+            "description": "List companies (role-based filtering)\n- SUPER_ADMIN: sees all\n- ADMIN: sees companies of assigned clients\n- USER: sees companies where they are members"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Company",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tech Solutions Pvt Ltd\",\n  \"registrationNumber\": \"CIN12345ABC\",\n  \"email\": \"contact@techsolutions.com\",\n  \"phone\": \"9876543210\",\n  \"address\": {\n    \"street\": \"123 Main Street\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"country\": \"India\"\n  },\n  \"client\": \"65f1234567890abcdef12345\",\n  \"members\": [\n    {\n      \"user\": \"65f1234567890abcdef67890\",\n      \"role\": \"OWNER\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/companies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies"
+              ]
+            },
+            "description": "Create new company\n- SUPER_ADMIN: any client\n- ADMIN: only assigned clients\n- USER: auto-added as OWNER"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Company Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/companies/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "65f1234567890abcdef12345",
+                  "description": "Company ID"
+                }
+              ]
+            },
+            "description": "Get company details\n- SUPER_ADMIN: any company\n- ADMIN: companies of assigned clients\n- USER: only if member"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Company",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Tech Solutions Pvt Ltd\",\n  \"registrationNumber\": \"CIN12345ABC\",\n  \"email\": \"info@techsolutions.com\",\n  \"phone\": \"9876543211\",\n  \"address\": {\n    \"street\": \"456 New Street\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400002\",\n    \"country\": \"India\"\n  },\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/companies/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "65f1234567890abcdef12345",
+                  "description": "Company ID"
+                }
+              ]
+            },
+            "description": "Update company\n- SUPER_ADMIN: any company + can change status\n- ADMIN: companies of assigned clients\n- USER (OWNER): their companies only\nNote: status can only be changed by SUPER_ADMIN"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Company",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/companies/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "65f1234567890abcdef12345",
+                  "description": "Company ID"
+                }
+              ]
+            },
+            "description": "Delete company (SUPER_ADMIN only)\n- Removes company from client's companies array\n- Permanently deletes company"
+          },
+          "response": []
+        },
+        {
+          "name": "Add Member to Company",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"65f1234567890abcdef67890\",\n  \"role\": \"EDITOR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/companies/:id/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                ":id",
+                "members"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "65f1234567890abcdef12345",
+                  "description": "Company ID"
+                }
+              ]
+            },
+            "description": "Add member to company\n- SUPER_ADMIN: any company\n- ADMIN: companies of assigned clients\n- USER (OWNER): their companies only\n\nRoles: OWNER, EDITOR, VIEWER"
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Member from Company",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/companies/:id/members/:userId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                ":id",
+                "members",
+                ":userId"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "65f1234567890abcdef12345",
+                  "description": "Company ID"
+                },
+                {
+                  "key": "userId",
+                  "value": "65f1234567890abcdef67890",
+                  "description": "User ID to remove"
+                }
+              ]
+            },
+            "description": "Remove member from company\n- SUPER_ADMIN: any company\n- ADMIN: companies of assigned clients\n- USER (OWNER): their companies only\n\nNote: Cannot remove last OWNER"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Member Role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"VIEWER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/companies/:id/members/:userId/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                ":id",
+                "members",
+                ":userId",
+                "role"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "65f1234567890abcdef12345",
+                  "description": "Company ID"
+                },
+                {
+                  "key": "userId",
+                  "value": "65f1234567890abcdef67890",
+                  "description": "User ID to update"
+                }
+              ]
+            },
+            "description": "Update member role\n- SUPER_ADMIN: any company\n- ADMIN: companies of assigned clients\n- USER (OWNER): their companies only\n\nRoles: OWNER, EDITOR, VIEWER\nNote: Cannot downgrade last OWNER"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Phase 2.4 - Compliances & Services",
+      "item": [
+        {
+          "name": "Compliances",
+          "item": [
+            {
+              "name": "List Compliances",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/compliances?company=",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "compliances"
+                  ],
+                  "query": [
+                    {
+                      "key": "company",
+                      "value": "",
+                      "description": "Filter by company ID"
+                    }
+                  ]
+                },
+                "description": "Get all compliances with optional company filtering"
+              },
+              "response": []
+            },
+            {
+              "name": "Get Compliance Stats",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/compliances/stats",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "compliances",
+                    "stats"
+                  ]
+                },
+                "description": "Get compliance statistics for the dashboard"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Services",
+          "item": [
+            {
+              "name": "List Services",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/services",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "services"
+                  ]
+                },
+                "description": "Get all marketplace services"
+              },
+              "response": []
+            },
+            {
+              "name": "Get Service by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/services/:id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "services",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "",
+                      "description": "Service ID"
+                    }
+                  ]
+                },
+                "description": "Get details of a specific service"
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "setupKey",
+      "value": "your-super-secret-key-here-change-this",
+      "type": "string"
+    }
+  ]
+}
