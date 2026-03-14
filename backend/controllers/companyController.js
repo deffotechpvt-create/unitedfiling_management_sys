@@ -1,5 +1,6 @@
 const Company = require('../models/Company');
 const Client = require('../models/Client');
+const Compliance = require('../models/Compliance');
 const ApiResponse = require('../utils/ApiResponse');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
@@ -15,32 +16,68 @@ exports.getAllCompanies = asyncHandler(async (req, res) => {
     const { status, client, search } = req.query;
     const { role, _id: userId } = req.user;
 
+    // Pagination params
+    const page = parseInt(req.query.page) || 1;
+    const limitParams = req.query.limit;
+    let limit;
+    if (limitParams === 'all' || limitParams === '0') {
+        limit = 0; // return all
+    } else {
+        limit = parseInt(limitParams) || 10; // default to 10
+    }
+    const skip = (page - 1) * limit;
+
     let filter = {};
 
-    // Role-based filtering
+    // ─── ROLE-BASED SCOPE (immutable base — cannot be overridden by query params) ───
     if (role === constants.ROLES.SUPER_ADMIN) {
-        // SUPER_ADMIN sees all companies
+        // SUPER_ADMIN sees all companies — no base filter
+        // Optional: allow ?client= param to filter by specific client
+        if (client && mongoose.Types.ObjectId.isValid(client)) {
+            filter.client = client;
+        }
     } else if (role === constants.ROLES.ADMIN) {
-        // ADMIN sees companies of their assigned clients
-        const clients = await Client.find({ assignedAdmin: userId }).select('_id');
-        const clientIds = clients.map(c => c._id);
-        filter.client = { $in: clientIds };
+        // ADMIN sees ONLY companies belonging to their assigned clients
+        const myClients = await Client.find({ assignedAdmin: userId }).select('_id');
+        const myClientIds = myClients.map(c => c._id);
+
+        // If a specific client is requested, validate it is in their assigned list
+        if (client && mongoose.Types.ObjectId.isValid(client)) {
+            const requestedClientId = new mongoose.Types.ObjectId(client);
+            const isAssigned = myClientIds.some(id => id.equals(requestedClientId));
+            if (!isAssigned) {
+                // Requested client not assigned to this ADMIN — deny silently with empty set
+                return res.status(200).json(
+                    new ApiResponse(200, {
+                        message: 'Companies fetched successfully',
+                        companies: [],
+                        count: 0,
+                    })
+                );
+            }
+            filter.client = requestedClientId; // Narrow to the specific requested assigned client
+        } else {
+            filter.client = { $in: myClientIds }; // All assigned clients
+        }
     } else if (role === constants.ROLES.USER) {
-        // USER sees only companies where they are members
+        // USER sees ONLY companies where they are a member
+        // USERs CANNOT filter by client — that would expose other users' companies
         filter['members.user'] = userId;
+    } else {
+        // Unknown role — deny access with empty result
+        return res.status(200).json(
+            new ApiResponse(200, { message: 'Companies fetched successfully', companies: [], count: 0 })
+        );
     }
 
-    // Status filter
+    // ─── ADDITIONAL FILTERS (only applied on top of role scope, never replace it) ───
+
+    // Status filter (safe for all roles)
     if (status && Object.values(constants.STATUS).includes(status)) {
         filter.status = status;
     }
 
-    // Client filter
-    if (client && mongoose.Types.ObjectId.isValid(client)) {
-        filter.client = client;
-    }
-
-    // Search filter
+    // Search filter (safe for all roles)
     if (search) {
         filter.$or = [
             { name: { $regex: search, $options: 'i' } },
@@ -49,16 +86,26 @@ exports.getAllCompanies = asyncHandler(async (req, res) => {
         ];
     }
 
-    const companies = await Company.find(filter)
+    const totalCount = await Company.countDocuments(filter);
+
+    let companiesQuery = Company.find(filter)
         .populate('client', 'name companyName email phone status')
         .populate('members.user', 'name email role')
         .sort({ createdAt: -1 });
+
+    if (limit > 0) {
+        companiesQuery = companiesQuery.skip(skip).limit(limit);
+    }
+
+    const companies = await companiesQuery;
 
     return res.status(200).json(
         new ApiResponse(200, {
             message: 'Companies fetched successfully',
             companies,
-            count: companies.length,
+            count: totalCount,
+            totalPages: limit > 0 ? Math.ceil(totalCount / limit) : 1,
+            currentPage: page,
         })
     );
 });
@@ -112,24 +159,41 @@ exports.getCompanyById = asyncHandler(async (req, res) => {
  * @access  Private (SUPER_ADMIN, ADMIN, USER)
  */
 exports.createCompany = asyncHandler(async (req, res) => {
-    const { name, registrationNumber, email, phone, address, client, members } = req.body;
+    const { name, registrationNumber, email, phone, address, members } = req.body;
+    let { client } = req.body;
     const { role, _id: userId } = req.user;
 
-    // Validate client exists
-    const clientDoc = await Client.findById(client);
-    if (!clientDoc) {
-        throw new ApiError(404, 'Client not found');
-    }
+    let clientDoc = null;
 
-    // Authorization check
-    if (role === constants.ROLES.ADMIN) {
-        // ADMIN can only create companies for their assigned clients
-        if (clientDoc.assignedAdmin?.toString() !== userId.toString()) {
-            throw new ApiError(403, 'You can only create companies for your assigned clients');
+    if (role === constants.ROLES.USER) {
+        // Automatically find the client document belonging to the user
+        clientDoc = await Client.findOne({ userId });
+        if (!clientDoc) {
+            // Lazy-create client record for the user if it doesn't exist
+            clientDoc = await Client.create({
+                userId,
+                name: req.user.name,
+                companyName: `${req.user.name}'s Group`,
+                email: req.user.email,
+                phone: req.user.phone,
+                status: constants.CLIENT_STATUS.ACTIVE
+            });
         }
-    } else if (role === constants.ROLES.USER) {
-        // USER can create companies (will be added as OWNER automatically)
-        // No additional check needed
+        client = clientDoc._id; // Force payload to own client securely
+    } else {
+        // Validate specifically passed client for ADMIN/SUPER_ADMIN
+        clientDoc = await Client.findById(client);
+        if (!clientDoc) {
+            throw new ApiError(404, 'Client not found');
+        }
+
+        // Authorization check for ADMIN
+        if (role === constants.ROLES.ADMIN) {
+            // ADMIN can only create companies for their assigned clients
+            if (clientDoc.assignedAdmin?.toString() !== userId.toString()) {
+                throw new ApiError(403, 'You can only create companies for your assigned clients');
+            }
+        }
     }
 
     // Check if registration number already exists
@@ -142,23 +206,63 @@ exports.createCompany = asyncHandler(async (req, res) => {
 
     const companyData = {
         name,
-        registrationNumber,
-        email,
-        phone,
-        address,
         client,
         members: members || [],
     };
 
+    if (registrationNumber) companyData.registrationNumber = registrationNumber;
+    if (email) companyData.email = email;
+    if (phone) companyData.phone = phone;
+    if (address && Object.keys(address).length > 0) companyData.address = address;
+
+    // Prevent duplicates in members assignment dynamically
+    const hasOwnerAssigned = companyData.members.find(m => m.role === constants.COMPANY_ROLES.OWNER);
+
     // If USER is creating, add them as OWNER
-    if (role === constants.ROLES.USER) {
+    if (role === constants.ROLES.USER && !hasOwnerAssigned) {
         companyData.members.push({
             user: userId,
+            role: constants.COMPANY_ROLES.OWNER,
+        });
+    } else if (!hasOwnerAssigned && clientDoc.userId) {
+        // If an ADMIN/SUPER_ADMIN creates it for a client, add the client's underlying user as the OWNER
+        companyData.members.push({
+            user: clientDoc.userId,
             role: constants.COMPANY_ROLES.OWNER,
         });
     }
 
     const company = await Company.create(companyData);
+
+    // ===========================================
+    // AUTO-ASSIGN DEFAULT COMPLIANCES
+    // ===========================================
+    const defaultCompliances = [
+        { serviceType: 'GST Filing', department: constants.DEPARTMENTS.GST, frequency: 'Monthly', days: 30, risk: constants.RISK_LEVELS.HIGH },
+        { serviceType: 'TDS Filing', department: constants.DEPARTMENTS.TAX, frequency: 'Quarterly', days: 60, risk: constants.RISK_LEVELS.MEDIUM },
+        { serviceType: 'Income Tax Return (ITR)', department: constants.DEPARTMENTS.TAX, frequency: 'Annual', days: 90, risk: constants.RISK_LEVELS.HIGH },
+        { serviceType: 'ROC Annual Filing', department: constants.DEPARTMENTS.ROC, frequency: 'Annual', days: 120, risk: constants.RISK_LEVELS.MEDIUM }
+    ];
+
+    const compliancePromises = defaultCompliances.map(comp => {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + comp.days);
+
+        return Compliance.create({
+            company: company._id,
+            client: company.client,
+            serviceType: comp.serviceType,
+            department: comp.department,
+            status: constants.COMPLIANCE_STATUS.PENDING,
+            stage: constants.COMPLIANCE_STAGES.PAYMENT,
+            risk: comp.risk,
+            dueDate,
+            isMandatory: true,
+            createdBy: userId
+        });
+    });
+
+    await Promise.all(compliancePromises);
 
     const populatedCompany = await Company.findById(company._id)
         .populate('client', 'name companyName email')
@@ -214,9 +318,9 @@ exports.updateCompany = asyncHandler(async (req, res) => {
 
     // Update fields
     if (name) company.name = name;
-    if (registrationNumber !== undefined) company.registrationNumber = registrationNumber;
-    if (email !== undefined) company.email = email;
-    if (phone !== undefined) company.phone = phone;
+    if (registrationNumber !== undefined) company.registrationNumber = registrationNumber || undefined;
+    if (email !== undefined) company.email = email || undefined;
+    if (phone !== undefined) company.phone = phone || undefined;
     if (address) company.address = { ...company.address, ...address };
 
     // Only SUPER_ADMIN can change status
@@ -245,6 +349,7 @@ exports.updateCompany = asyncHandler(async (req, res) => {
  */
 exports.deleteCompany = asyncHandler(async (req, res) => {
     const { id } = req.params;
+    const { role, _id: userId } = req.user;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw new ApiError(400, 'Invalid company ID');
@@ -253,6 +358,21 @@ exports.deleteCompany = asyncHandler(async (req, res) => {
     const company = await Company.findById(id);
     if (!company) {
         throw new ApiError(404, 'Company not found');
+    }
+
+    // Role-based access validation
+    if (role === constants.ROLES.SUPER_ADMIN) {
+        // SUPER_ADMIN can delete any company
+    } else if (role === constants.ROLES.ADMIN) {
+        // ADMIN can delete only if company belongs to their assigned client
+        const client = await Client.findById(company.client);
+        if (!client || client.assignedAdmin?.toString() !== userId.toString()) {
+            throw new ApiError(403, 'You do not have permission to delete this company');
+        }
+    } else if (role === constants.ROLES.USER) {
+        throw new ApiError(403, 'Users are not permitted to delete companies. Please contact support.');
+    } else {
+        throw new ApiError(403, 'Not authorized to perform this action');
     }
 
     // Remove company from client's companies array
@@ -265,6 +385,46 @@ exports.deleteCompany = asyncHandler(async (req, res) => {
 
     return res.status(200).json(
         new ApiResponse(200, { message: 'Company deleted successfully' })
+    );
+});
+
+/**
+ * @desc    Get users that can be added as company members
+ * @route   GET /api/companies/:id/members/addable-users
+ * @access  Private (SUPER_ADMIN, ADMIN, OWNER)
+ */
+exports.getAddableUsers = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { role, _id: currentUserId } = req.user;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new ApiError(400, 'Invalid company ID');
+    }
+
+    const company = await Company.findById(id);
+    if (!company) {
+        throw new ApiError(404, 'Company not found');
+    }
+
+    // Authorization check
+    if (role === constants.ROLES.ADMIN) {
+        const client = await Client.findById(company.client);
+        if (!client || client.assignedAdmin?.toString() !== currentUserId.toString()) {
+            throw new ApiError(403, 'You can only manage members of your assigned clients');
+        }
+    }
+
+    const existingMemberIds = company.members.map(m => m.user.toString());
+    const User = mongoose.model('User');
+    const users = await User.find({ _id: { $nin: existingMemberIds } })
+        .select('name email role')
+        .limit(100);
+
+    return res.status(200).json(
+        new ApiResponse(200, {
+            users: users.map(u => ({ _id: u._id, id: u._id, name: u.name, email: u.email, role: u.role })),
+            message: 'Users retrieved successfully',
+        })
     );
 });
 
@@ -292,12 +452,7 @@ exports.addMember = asyncHandler(async (req, res) => {
     }
 
     // Authorization check
-    if (role === constants.ROLES.USER) {
-        const userRole = company.getUserRole(currentUserId);
-        if (userRole !== constants.COMPANY_ROLES.OWNER) {
-            throw new ApiError(403, 'Only company owners can add members');
-        }
-    } else if (role === constants.ROLES.ADMIN) {
+    if (role === constants.ROLES.ADMIN) {
         const client = await Client.findById(company.client);
         if (!client || client.assignedAdmin?.toString() !== currentUserId.toString()) {
             throw new ApiError(403, 'You can only manage members of your assigned clients');
@@ -343,12 +498,7 @@ exports.removeMember = asyncHandler(async (req, res) => {
     }
 
     // Authorization check
-    if (role === constants.ROLES.USER) {
-        const userRole = company.getUserRole(currentUserId);
-        if (userRole !== constants.COMPANY_ROLES.OWNER) {
-            throw new ApiError(403, 'Only company owners can remove members');
-        }
-    } else if (role === constants.ROLES.ADMIN) {
+    if (role === constants.ROLES.ADMIN) {
         const client = await Client.findById(company.client);
         if (!client || client.assignedAdmin?.toString() !== currentUserId.toString()) {
             throw new ApiError(403, 'You can only manage members of your assigned clients');
@@ -399,12 +549,7 @@ exports.updateMemberRole = asyncHandler(async (req, res) => {
     }
 
     // Authorization check
-    if (role === constants.ROLES.USER) {
-        const userRole = company.getUserRole(currentUserId);
-        if (userRole !== constants.COMPANY_ROLES.OWNER) {
-            throw new ApiError(403, 'Only company owners can update member roles');
-        }
-    } else if (role === constants.ROLES.ADMIN) {
+    if (role === constants.ROLES.ADMIN) {
         const client = await Client.findById(company.client);
         if (!client || client.assignedAdmin?.toString() !== currentUserId.toString()) {
             throw new ApiError(403, 'You can only manage members of your assigned clients');

@@ -10,7 +10,6 @@ const checkRole = (...roles) => {
     if (!req.user) {
       return next(new ApiError(401, 'Authentication required'));
     }
-
     const userRole = req.user.role;
     const allowedRoles = roles.flat();
 
@@ -24,8 +23,5 @@ const checkRole = (...roles) => {
     next();
   };
 };
-
-module.exports = checkRole;
-
 
 module.exports = checkRole;

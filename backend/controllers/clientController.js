@@ -14,6 +14,18 @@ const getAllClients = asyncHandler(async (req, res) => {
     // Build query with Role-based scoping
     const { role, _id: userId } = req.user;
     const { status, assignedAdmin, company, search } = req.query;
+    
+    // Pagination params
+    const page = parseInt(req.query.page) || 1;
+    const limitParams = req.query.limit;
+    let limit;
+    if (limitParams === 'all' || limitParams === '0') {
+        limit = 0; // return all
+    } else {
+        limit = parseInt(limitParams) || 10; // default to 10
+    }
+    const skip = (page - 1) * limit;
+
     let query = {};
 
     if (role === constants.ROLES.SUPER_ADMIN) {
@@ -62,15 +74,25 @@ const getAllClients = asyncHandler(async (req, res) => {
         ];
     }
 
-    const clients = await Client.find(query)
+    const totalCount = await Client.countDocuments(query);
+
+    let clientsQuery = Client.find(query)
         .populate('assignedAdmin', 'name email')
         .populate('userId', 'name email')
         .sort({ createdAt: -1 });
 
+    if (limit > 0) {
+        clientsQuery = clientsQuery.skip(skip).limit(limit);
+    }
+
+    const clients = await clientsQuery;
+
     res.status(200).json(
         new ApiResponse(200, {
             clients,
-            count: clients.length,
+            count: totalCount,
+            totalPages: limit > 0 ? Math.ceil(totalCount / limit) : 1,
+            currentPage: page,
             message: 'Clients retrieved successfully'
         })
     );
@@ -122,13 +144,16 @@ const createClient = asyncHandler(async (req, res) => {
         }
     }
 
-    // If ADMIN creates client, auto-assign to themselves
+    // If ADMIN creates client, they cannot assign an admin
     let adminToAssign = assignedAdmin;
     if (req.user.role === constants.ROLES.ADMIN) {
-        adminToAssign = req.user._id;
+        if (assignedAdmin) {
+            throw new ApiError(403, 'Only Super Admin can assign admins to clients');
+        }
+        adminToAssign = null; // Stays unassigned
     }
 
-    // Validate admin if provided
+    // Validate admin if provided (SUPER_ADMIN only)
     if (adminToAssign) {
         const admin = await User.findById(adminToAssign);
         if (!admin || admin.role !== constants.ROLES.ADMIN) {
@@ -191,7 +216,7 @@ const updateClient = asyncHandler(async (req, res) => {
     }
 
     // Update fields
-    const allowedFields = ['name', 'companyName', 'email', 'phone', 'status', 'assignedAdmin'];
+    const allowedFields = ['name', 'companyName', 'email', 'phone', 'status', 'assignedAdmin', 'pendingWork', 'completedWork'];
     allowedFields.forEach(field => {
         if (req.body[field] !== undefined) {
             client[field] = req.body[field];

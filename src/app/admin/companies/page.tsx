@@ -3,6 +3,7 @@
 import { useAuth } from "@/context/auth-context";
 import { useCompany } from "@/context/company-context";
 import { useClient } from "@/context/client-context";
+import companyService from "@/services/companyService";
 import { Button } from "@/components/ui/button";
 import {
     Table,
@@ -23,7 +24,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Building2, Search, Download, Plus, Pencil, Filter, Users } from "lucide-react";
+import { Building2, Search, Download, Plus, Pencil, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
     Select,
@@ -36,6 +37,8 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { ManageMembersDialog } from "@/components/company/ManageMembersDialog";
+import { canManageCompanies, isAdmin } from "@/lib/roles";
+import { downloadCSV } from "@/lib/export";
 
 export default function AdminCompanyListPage() {
     const { user } = useAuth();
@@ -43,15 +46,19 @@ export default function AdminCompanyListPage() {
         companies,
         stats,
         loading,
+        filters,
+        setFilters,
+        pagination,
+        setPage,
         createCompany,
         updateCompany,
-        refreshCompanies,
+        deleteCompany,
+        refreshAll,
     } = useCompany();
     const { clients, getAllClients } = useClient();
     const router = useRouter();
 
-    const [searchQuery, setSearchQuery] = useState("");
-    const [clientFilter, setClientFilter] = useState<string>("all");
+    const [localSearch, setLocalSearch] = useState(filters.search || "");
 
     // Dialog State
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -77,29 +84,37 @@ export default function AdminCompanyListPage() {
 
     // Enforce role check
     useEffect(() => {
-        if (user && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+        if (user && !canManageCompanies(user.role)) {
             router.push("/");
         }
     }, [user, router]);
 
-    // Load clients for the dropdown (only assigned clients for ADMIN)
+    // Load clients for the dropdown via context (getAllClients has built-in caching)
     useEffect(() => {
-        if (user?.role === "ADMIN") {
-            getAllClients();
+        if (isAdmin(user?.role)) {
+            getAllClients(); // Respects cache — won't re-fetch within 60s
         }
-    }, [user]);
+    }, [user?.role]);
 
-    // Apply local filters
-    const filteredCompanies = companies.filter((company: any) => {
-        const matchesSearch =
-            company.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            company.industry?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            company.registrationNumber?.toLowerCase().includes(searchQuery.toLowerCase());
+    // Handle search Input debounce
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (localSearch !== filters.search) {
+                setFilters(prev => ({ ...prev, search: localSearch }));
+            }
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [localSearch, setFilters, filters.search]);
 
-        const matchesClient = clientFilter === "all" || (company.client as any)?._id === clientFilter;
-
-        return matchesSearch && matchesClient;
-    });
+    const handleClientChange = (val: string) => {
+        setFilters(prev => {
+            if (val === "all") {
+                const { client, ...rest } = prev;
+                return rest;
+            }
+            return { ...prev, client: val };
+        });
+    };
 
     const handleOpenAdd = () => {
         setEditingCompany(null);
@@ -166,11 +181,46 @@ export default function AdminCompanyListPage() {
         setIsMembersDialogOpen(true);
     };
 
+    const handleDelete = async (companyId: string) => {
+        if (!window.confirm("Are you sure you want to delete this company?")) return;
+        try {
+            await deleteCompany(companyId);
+            toast.success("Company deleted successfully");
+            refreshAll(true);
+        } catch (error: any) {
+            toast.error(error.message || "Failed to delete company");
+        }
+    };
+
     const handleMemberUpdate = () => {
-        refreshCompanies();
+        refreshAll(true);
         if (selectedCompanyMembers) {
-            const updated = companies.find(c => c._id === selectedCompanyMembers._id);
+            const updated = companies.find((c: any) => c._id === selectedCompanyMembers._id);
             if (updated) setSelectedCompanyMembers(updated);
+        }
+    };
+
+    const handleExport = async () => {
+        try {
+            const response = await companyService.getAllCompanies({ ...filters, limit: 'all' });
+            const exportData = response.companies.map((company: any) => ({
+                "Company Name": company.name,
+                "Client Owner": (company.client as any)?.name || "N/A",
+                "Industry": company.industry || "General",
+                "Registration Number": company.registrationNumber || "N/A",
+                "Email": company.email || "",
+                "Phone": company.phone || "",
+                "Street": company.address?.street || "",
+                "City": company.address?.city || "",
+                "State": company.address?.state || "",
+                "Pincode": company.address?.pincode || "",
+                "Country": company.address?.country || "India",
+                "Members Count": company.members?.length || 0,
+                "Added Date": new Date(company.createdAt || Date.now()).toLocaleDateString("en-GB")
+            }));
+            downloadCSV(exportData, "admin_companies_export");
+        } catch (error) {
+            toast.error("Failed to export companies");
         }
     };
 
@@ -367,7 +417,7 @@ export default function AdminCompanyListPage() {
                         </DialogContent>
                     </Dialog>
 
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={handleExport}>
                         <Download className="mr-2 h-4 w-4" /> Export List
                     </Button>
                 </div>
@@ -417,11 +467,11 @@ export default function AdminCompanyListPage() {
                                 <Input
                                     placeholder="Search companies..."
                                     className="pl-8"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    value={localSearch}
+                                    onChange={(e) => setLocalSearch(e.target.value)}
                                 />
                             </div>
-                            <Select value={clientFilter} onValueChange={setClientFilter}>
+                            <Select value={filters.client || "all"} onValueChange={handleClientChange}>
                                 <SelectTrigger className="w-[180px]">
                                     <SelectValue placeholder="All Clients" />
                                 </SelectTrigger>
@@ -450,14 +500,14 @@ export default function AdminCompanyListPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredCompanies.length === 0 ? (
+                            {companies.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                                         No companies found for your assigned clients.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredCompanies.map((company) => (
+                                companies.map((company) => (
                                     <TableRow key={company._id}>
                                         <TableCell className="font-medium">
                                             <div className="flex items-center gap-3">
@@ -499,6 +549,17 @@ export default function AdminCompanyListPage() {
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
+                                                    className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                                    onClick={() => handleDelete(company._id)}
+                                                    title="Delete Company"
+                                                >
+                                                    <Badge variant="outline" className="border-none p-0 text-red-500">
+                                                        <Plus className="h-4 w-4 rotate-45" />
+                                                    </Badge>
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
                                                     className="h-8 w-8 p-0"
                                                     onClick={() => handleOpenEdit(company)}
                                                 >
@@ -511,6 +572,33 @@ export default function AdminCompanyListPage() {
                             )}
                         </TableBody>
                     </Table>
+
+                    {/* Pagination Controls */}
+                    {pagination.totalPages > 1 && (
+                        <div className="flex items-center justify-between px-2 py-4 border-t">
+                            <div className="text-sm text-slate-500">
+                                Showing page {pagination.page} of {pagination.totalPages} ({pagination.totalCount} total)
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage(Math.max(1, pagination.page - 1))}
+                                    disabled={pagination.page === 1}
+                                >
+                                    Previous
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage(Math.min(pagination.totalPages, pagination.page + 1))}
+                                    disabled={pagination.page === pagination.totalPages}
+                                >
+                                    Next
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 

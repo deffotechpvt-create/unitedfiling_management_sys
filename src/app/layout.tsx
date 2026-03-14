@@ -1,8 +1,8 @@
 "use client"
 
 import { usePathname } from "next/navigation"
-import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/providers/providers";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -16,18 +16,18 @@ const inter = Inter({ subsets: ["latin"] });
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isLoginPage = pathname === "/login"
+  const isAuthPage = pathname === "/login" || pathname === "/onboarding"
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {!isLoginPage && <Sidebar />}
-      <div className="flex flex-1 flex-col overflow-hidden lg:pl-64 transition-all duration-300">
-        {!isLoginPage && (
+      {!isAuthPage && <Sidebar />}
+      <div className={`flex flex-1 flex-col overflow-hidden ${!isAuthPage ? "lg:pl-64" : ""} transition-all duration-300`}>
+        {!isAuthPage && (
           <div className="sticky top-0 z-10 lg:static">
             <Header />
           </div>
         )}
-        <main className={`flex-1 overflow-y-auto bg-slate-50 p-4 md:p-6 ${isLoginPage ? "p-0" : ""}`}>
+        <main className={`flex-1 overflow-y-auto bg-slate-50 p-4 md:p-6 ${isAuthPage ? "p-0" : ""}`}>
           {children}
         </main>
       </div>
@@ -46,6 +46,7 @@ export default function RootLayout({
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>
+        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       </body>
     </html>
   );

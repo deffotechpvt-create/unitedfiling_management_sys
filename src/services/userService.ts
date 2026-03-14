@@ -1,7 +1,6 @@
 // src/services/userService.ts
 import api from '@/lib/api';
 import { User } from '@/types';
-import { get } from 'http';
 
 export interface AdminWithUtilization {
     id: string;
@@ -44,6 +43,12 @@ export const userService = {
 
         // OR if your API returns { success: true, serverdata: {...} }
         // return data.serverdata;
+    },
+
+    // Get admins for compliance assignment (ADMIN + SUPER_ADMIN)
+    async getAdminsForAssignment(): Promise<{ admins: { _id: string; id: string; name: string; email: string }[]; message: string }> {
+        const { data } = await api.get('/users/admins/for-assignment');
+        return data;
     },
 
     // Get all admins with utilization

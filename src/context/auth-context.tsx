@@ -34,12 +34,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const response = await authService.getMe();
 
             if (response.success && response.user) {
-                setUser(response.user);
+                const u = response.user as any;
+                setUser({ ...u, _id: u._id || u.id });
             } else {
                 setUser(null);
             }
         } catch (err) {
-            console.log("Not authenticated");
             setUser(null);
         } finally {
             setLoading(false);
@@ -54,7 +54,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const response = await authService.login(credentials);
 
             if (response.success && response.user) {
-                setUser(response.user);
+                const u = response.user as any;
+                setUser({ ...u, _id: u._id || u.id });
                 router.push("/"); // Redirect to dashboard/home
             } else {
                 throw new Error(response.message || "Login failed");
@@ -76,7 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const response = await authService.register(data);
 
             if (response.success && response.user) {
-                setUser(response.user);
+                const u = response.user as any;
+                setUser({ ...u, _id: u._id || u.id });
                 router.push("/");
             } else {
                 throw new Error(response.message || "Registration failed");
@@ -114,7 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const response = await authService.updateProfile(data);
 
             if (response.success && response.user) {
-                setUser(response.user);
+                const u = response.user as any;
+                setUser({ ...u, _id: u._id || u.id });
             } else {
                 throw new Error(response.message || "Update failed");
             }
@@ -127,6 +130,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const forgotPassword = async (email: string) => {
+        try {
+            setError(null);
+            // setLoading(true);
+            await authService.forgotPassword(email);
+        } catch (err: any) {
+            const errorMessage = err.response?.data?.message || err.message || "Forgot password request failed";
+            setError(errorMessage);
+            throw new Error(errorMessage);
+        } finally {
+            // setLoading(false);
+        }
+    };
+
+    const resetPassword = async (token: string, password: string) => {
+        try {
+            setError(null);
+            // setLoading(true);
+            await authService.resetPassword(token, password);
+        } catch (err: any) {
+            const errorMessage = err.response?.data?.message || err.message || "Password reset failed";
+            setError(errorMessage);
+            throw new Error(errorMessage);
+        } finally {
+            // setLoading(false);
+        }
+    };
+
+    const updateOnboardingTask = React.useCallback(async (task: string, completed: boolean = true) => {
+        try {
+            const response = await authService.updateOnboardingTask(task, completed);
+            if (response.success && response.onboardingTasks) {
+                setUser(prev => prev ? { ...prev, onboardingTasks: response.onboardingTasks } : null);
+            }
+        } catch (err: any) {
+            console.error("Failed to update onboarding task:", err);
+        }
+    }, []);
+
     const value: AuthContextType = {
         user,
         loading,
@@ -135,6 +177,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         logout,
         updateProfile,
+        forgotPassword,
+        resetPassword,
+        updateOnboardingTask: updateOnboardingTask as any,
         isAuthenticated: !!user,
     };
 

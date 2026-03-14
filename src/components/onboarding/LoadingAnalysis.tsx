@@ -10,7 +10,9 @@ import { Button } from '@/components/ui/button';
 import { useOnboardingStore } from '@/store/useOnboardingStore';
 import { useRouter } from 'next/navigation';
 
-export function LoadingAnalysis({ onComplete }: { onComplete?: () => void }) { // handling onComplete differently here internally
+
+export function LoadingAnalysis({ onComplete }: { onComplete?: () => void }) { 
+
     const [progress, setProgress] = useState(0);
     const [completedSteps, setCompletedSteps] = useState<number[]>([]);
     const [isFinished, setIsFinished] = useState(false);
@@ -76,6 +78,7 @@ export function LoadingAnalysis({ onComplete }: { onComplete?: () => void }) { /
 
     const handleGoToDashboard = () => {
         useOnboardingStore.getState().completeOnboarding();
+        if (onComplete) onComplete(); 
         router.push('/calendar');
     };
 

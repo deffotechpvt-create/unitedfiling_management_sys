@@ -12,10 +12,13 @@ import { Bell, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
+import { useCompliance } from "@/context/compliance-context"
 import { useAuth } from "@/context/auth-context"
+import { isSuperAdmin } from "@/lib/roles"
 
 export function Header() {
     const { selectedCompany, setSelectedCompany, companies } = useCompany()
+    const { globalSearch, setGlobalSearch } = useCompliance()
     const { user } = useAuth()
 
     return (
@@ -39,7 +42,7 @@ export function Header() {
                         <SelectContent>
                             <SelectItem value="all">
                                 <span className="font-medium text-slate-900">
-                                    {user?.role === "SUPER_ADMIN" ? "All Companies" : "All My Companies"}
+                                    {isSuperAdmin(user?.role) ? "All Companies" : "All My Companies"}
                                 </span>
                             </SelectItem>
                             {companies.map((company) => {
@@ -61,6 +64,8 @@ export function Header() {
                     <Input
                         type="search"
                         placeholder="Search..."
+                        value={globalSearch}
+                        onChange={(e) => setGlobalSearch(e.target.value)}
                         className="w-full bg-slate-50 pl-9 border-slate-200 focus-visible:ring-slate-400"
                     />
                 </div>

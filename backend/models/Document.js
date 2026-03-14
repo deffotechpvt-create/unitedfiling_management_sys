@@ -11,6 +11,10 @@ const DocumentSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Document URL is required'],
     },
+    publicId: {
+        type: String,
+        required: [true, 'Public ID is required'],
+    },
     folder: {
         type: String,
         default: 'General',
@@ -85,12 +89,11 @@ DocumentSchema.pre('save', async function (next) {
 });
 
 /**
- * Pre-remove: Delete file from R2 (if needed)
+ * Pre-remove: Delete file from Cloudinary
  */
 DocumentSchema.pre('remove', async function (next) {
-    // TODO: Implement R2 file deletion here
-    // const { deleteFromR2 } = require('../utils/fileStorage');
-    // await deleteFromR2(this.url);
+    const { deleteFromCloudinary } = require('../utils/cloudinaryUpload');
+    await deleteFromCloudinary(this.publicId);
     next();
 });
 

@@ -30,9 +30,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { UserPlus, Shield, Trash2, Search, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
-import companyService from "@/services/companyService";
-import { userService } from "@/services/userService";
+import { useCompany } from "@/context/company-context";
+import { useAuth } from "@/context/auth-context";
 import { Company, User } from "@/types";
+import { ROLES } from "@/lib/roles";
 
 interface ManageMembersDialogProps {
     isOpen: boolean;
@@ -47,6 +48,14 @@ export function ManageMembersDialog({
     company,
     onUpdate,
 }: ManageMembersDialogProps) {
+    const { 
+        getAddableUsers, 
+        addMember, 
+        removeMember, 
+        updateMemberRole 
+    } = useCompany();
+    const { user } = useAuth();
+    
     const [allUsers, setAllUsers] = useState<User[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedUserId, setSelectedUserId] = useState("");
@@ -54,20 +63,26 @@ export function ManageMembersDialog({
     const [loading, setLoading] = useState(false);
     const [fetchingUsers, setFetchingUsers] = useState(false);
 
-    // Load all users to allow adding
+    const canManageMembers = user?.role === ROLES.SUPER_ADMIN || user?.role === ROLES.ADMIN;
+
+    // Load all users to allow adding (Only for Management)
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && canManageMembers) {
             fetchUsers();
         }
-    }, [isOpen]);
+    }, [isOpen, canManageMembers, company._id]);
 
     const fetchUsers = async () => {
+        if (!canManageMembers) return; // Safeguard to prevent unauthorized API calls
+        
         setFetchingUsers(true);
         try {
-            const { users } = await userService.getAllUsers();
-            setAllUsers(users);
+            const users = await getAddableUsers(company._id);
+            if (Array.isArray(users)) {
+                setAllUsers(users);
+            }
         } catch (error: any) {
-            toast.error("Failed to load users");
+            console.error("Failed to load users", error);
         } finally {
             setFetchingUsers(false);
         }
@@ -81,13 +96,14 @@ export function ManageMembersDialog({
 
         setLoading(true);
         try {
-            await companyService.addMember(company._id, {
-                userId: selectedUserId,
-                role: selectedRole,
-            });
-            toast.success("Member added successfully");
-            setSelectedUserId("");
-            onUpdate();
+            const success = await addMember(company._id, selectedUserId, selectedRole);
+            if (success) {
+                toast.success("Member added successfully");
+                setSelectedUserId("");
+                onUpdate();
+                // Optionally refresh users list if they are removed from addable list
+                fetchUsers();
+            }
         } catch (error: any) {
             toast.error(error.message || "Failed to add member");
         } finally {
@@ -100,9 +116,12 @@ export function ManageMembersDialog({
 
         setLoading(true);
         try {
-            await companyService.removeMember(company._id, userId);
-            toast.success("Member removed successfully");
-            onUpdate();
+            const success = await removeMember(company._id, userId);
+            if (success) {
+                toast.success("Member removed successfully");
+                onUpdate();
+                fetchUsers();
+            }
         } catch (error: any) {
             toast.error(error.message || "Failed to remove member");
         } finally {
@@ -113,9 +132,11 @@ export function ManageMembersDialog({
     const handleUpdateRole = async (userId: string, role: "OWNER" | "EDITOR" | "VIEWER") => {
         setLoading(true);
         try {
-            await companyService.updateMemberRole(company._id, userId, { role });
-            toast.success("Role updated successfully");
-            onUpdate();
+            const success = await updateMemberRole(company._id, userId, role);
+            if (success) {
+                toast.success("Role updated successfully");
+                onUpdate();
+            }
         } catch (error: any) {
             toast.error(error.message || "Failed to update role");
         } finally {
@@ -145,72 +166,74 @@ export function ManageMembersDialog({
                 </DialogHeader>
 
                 <div className="space-y-8 mt-6">
-                    {/* Add Member Bar */}
-                    <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-200 shadow-sm">
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                            <div className="md:col-span-6 space-y-2">
-                                <Label htmlFor="user-select" className="text-[10px] font-bold uppercase tracking-wider text-slate-500 ml-1">
-                                    Pick a User
-                                </Label>
-                                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                                    <SelectTrigger id="user-select" className="bg-white h-11 border-slate-200 focus:ring-blue-500 rounded-lg">
-                                        <SelectValue placeholder={fetchingUsers ? "Loading..." : "Search and select user..."} />
-                                    </SelectTrigger>
-                                    <SelectContent className="max-h-[300px]">
-                                        <div className="p-2 sticky top-0 bg-white shadow-sm mb-1 z-10 border-b">
-                                            <div className="relative">
-                                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                                                <Input
-                                                    placeholder="Search users..."
-                                                    className="pl-9 h-9 text-sm border-slate-100 bg-slate-50/50 focus:bg-white"
-                                                    value={searchTerm}
-                                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                                />
+                    {/* Add Member Bar - Only for ADMIN/SUPER_ADMIN */}
+                    {canManageMembers && (
+                        <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-200 shadow-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                                <div className="md:col-span-6 space-y-2">
+                                    <Label htmlFor="user-select" className="text-[10px] font-bold uppercase tracking-wider text-slate-500 ml-1">
+                                        Pick a User
+                                    </Label>
+                                    <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                                        <SelectTrigger id="user-select" className="bg-white h-11 border-slate-200 focus:ring-blue-500 rounded-lg">
+                                            <SelectValue placeholder={fetchingUsers ? "Loading..." : "Search and select user..."} />
+                                        </SelectTrigger>
+                                        <SelectContent className="max-h-[300px]">
+                                            <div className="p-2 sticky top-0 bg-white shadow-sm mb-1 z-10 border-b">
+                                                <div className="relative">
+                                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                                                    <Input
+                                                        placeholder="Search users..."
+                                                        className="pl-9 h-9 text-sm border-slate-100 bg-slate-50/50 focus:bg-white"
+                                                        value={searchTerm}
+                                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                                    />
+                                                </div>
                                             </div>
-                                        </div>
-                                        {availableUsers.length === 0 ? (
-                                            <div className="p-8 text-center text-sm text-slate-500 italic">No available users found</div>
-                                        ) : (
-                                            availableUsers.map((u) => (
-                                                <SelectItem key={u._id} value={u._id} className="cursor-pointer py-3 focus:bg-blue-50">
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <span className="font-semibold text-sm text-slate-900">{u.name}</span>
-                                                        <span className="text-[10px] text-slate-500 leading-tight">{u.email}</span>
-                                                        <Badge variant="outline" className="w-fit text-[8px] h-4 mt-1 bg-slate-50 text-slate-500 border-slate-100">User</Badge>
-                                                    </div>
-                                                </SelectItem>
-                                            ))
-                                        )}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="md:col-span-3 space-y-2">
-                                <Label htmlFor="role-select" className="text-[10px] font-bold uppercase tracking-wider text-slate-500 ml-1">
-                                    Access Level
-                                </Label>
-                                <Select value={selectedRole} onValueChange={(val: any) => setSelectedRole(val)}>
-                                    <SelectTrigger id="role-select" className="bg-white h-11 border-slate-200 focus:ring-blue-500 rounded-lg">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="OWNER" className="font-medium">Owner</SelectItem>
-                                        <SelectItem value="EDITOR" className="font-medium">Editor</SelectItem>
-                                        <SelectItem value="VIEWER" className="font-medium">Viewer</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="md:col-span-3">
-                                <Button
-                                    onClick={handleAddMember}
-                                    disabled={loading || !selectedUserId}
-                                    className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-100 transition-all font-semibold rounded-lg flex items-center justify-center gap-2 group"
-                                >
-                                    <UserPlus className="h-4 w-4 group-hover:scale-110 transition-transform" />
-                                    <span>Add Member</span>
-                                </Button>
+                                            {availableUsers.length === 0 ? (
+                                                <div className="p-8 text-center text-sm text-slate-500 italic">No available users found</div>
+                                            ) : (
+                                                availableUsers.map((u) => (
+                                                    <SelectItem key={u._id} value={u._id} className="cursor-pointer py-3 focus:bg-blue-50">
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <span className="font-semibold text-sm text-slate-900">{u.name}</span>
+                                                            <span className="text-[10px] text-slate-500 leading-tight">{u.email}</span>
+                                                            <Badge variant="outline" className="w-fit text-[8px] h-4 mt-1 bg-slate-50 text-slate-500 border-slate-100">User</Badge>
+                                                        </div>
+                                                    </SelectItem>
+                                                ))
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="md:col-span-3 space-y-2">
+                                    <Label htmlFor="role-select" className="text-[10px] font-bold uppercase tracking-wider text-slate-500 ml-1">
+                                        Access Level
+                                    </Label>
+                                    <Select value={selectedRole} onValueChange={(val: any) => setSelectedRole(val)}>
+                                        <SelectTrigger id="role-select" className="bg-white h-11 border-slate-200 focus:ring-blue-500 rounded-lg">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="OWNER" className="font-medium">Owner</SelectItem>
+                                            <SelectItem value="EDITOR" className="font-medium">Editor</SelectItem>
+                                            <SelectItem value="VIEWER" className="font-medium">Viewer</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="md:col-span-3">
+                                    <Button
+                                        onClick={handleAddMember}
+                                        disabled={loading || !selectedUserId}
+                                        className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-100 transition-all font-semibold rounded-lg flex items-center justify-center gap-2 group"
+                                    >
+                                        <UserPlus className="h-4 w-4 group-hover:scale-110 transition-transform" />
+                                        <span>Add Member</span>
+                                    </Button>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Members Table */}
                     <div className="border rounded-md overflow-hidden bg-white">
@@ -219,7 +242,7 @@ export function ManageMembersDialog({
                                 <TableRow>
                                     <TableHead>User</TableHead>
                                     <TableHead>Role</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
+                                    {canManageMembers && <TableHead className="text-right">Action</TableHead>}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -252,37 +275,50 @@ export function ManageMembersDialog({
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Select
-                                                        value={member.role}
-                                                        onValueChange={(val: any) => handleUpdateRole(userId, val)}
-                                                        disabled={loading}
-                                                    >
-                                                        <SelectTrigger
-                                                            className={`h-8 w-[100px] text-xs font-semibold ${member.role === 'OWNER' ? 'text-red-600 border-red-100 bg-red-50' :
-                                                                member.role === 'EDITOR' ? 'text-blue-600 border-blue-100 bg-blue-50' :
-                                                                    'text-slate-600 border-slate-100 bg-slate-50'
+                                                    {canManageMembers ? (
+                                                        <Select
+                                                            value={member.role}
+                                                            onValueChange={(val: any) => handleUpdateRole(userId, val)}
+                                                            disabled={loading}
+                                                        >
+                                                            <SelectTrigger
+                                                                className={`h-8 w-[100px] text-xs font-semibold ${member.role === 'OWNER' ? 'text-red-600 border-red-100 bg-red-50' :
+                                                                    member.role === 'EDITOR' ? 'text-blue-600 border-blue-100 bg-blue-50' :
+                                                                        'text-slate-600 border-slate-100 bg-slate-50'
+                                                                    }`}
+                                                            >
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="OWNER">Owner</SelectItem>
+                                                                <SelectItem value="EDITOR">Editor</SelectItem>
+                                                                <SelectItem value="VIEWER">Viewer</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    ) : (
+                                                        <Badge
+                                                            className={`h-7 px-3 text-[10px] font-bold tracking-tight border shadow-none ${member.role === 'OWNER' ? 'bg-red-50 text-red-600 border-red-100' :
+                                                                member.role === 'EDITOR' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                                                    'bg-slate-50 text-slate-600 border-slate-100'
                                                                 }`}
                                                         >
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="OWNER">Owner</SelectItem>
-                                                            <SelectItem value="EDITOR">Editor</SelectItem>
-                                                            <SelectItem value="VIEWER">Viewer</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
+                                                            {member.role}
+                                                        </Badge>
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className="text-right">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleRemoveMember(userId)}
-                                                        disabled={loading}
-                                                        className="h-8 w-8 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </TableCell>
+                                                {canManageMembers && (
+                                                    <TableCell className="text-right">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleRemoveMember(userId)}
+                                                            disabled={loading}
+                                                            className="h-8 w-8 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </TableCell>
+                                                )}
                                             </TableRow>
                                         );
                                     })

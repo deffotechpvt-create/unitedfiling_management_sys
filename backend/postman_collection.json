@@ -36,11 +36,55 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "API Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": "Check if API is running and reachable"
+          },
+          "response": []
         }
       ]
     },
     {
-      "name": "Phase 1 - Authentication",
+      "name": "Phase 1 - Implementation Setup",
+      "item": [
+        {
+          "name": "Super Admin Setup",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Super Admin\",\n  \"email\": \"admin@unitedfillings.com\",\n  \"password\": \"adminPassword123!\",\n  \"setupKey\": \"your_setup_key_here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/setup/super-admin",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "setup", "super-admin"]
+            },
+            "description": "One-time setup for the first SUPER_ADMIN account."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Phase 1.1 - Authentication",
       "item": [
         {
           "name": "Register User",
@@ -188,6 +232,65 @@
                 "auth",
                 "profile"
               ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "forgot-password"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"newPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/reset-password/:token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "reset-password", ":token"],
+              "variable": [{ "key": "token", "value": "", "description": "Reset token" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Onboarding Task",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completed\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/onboarding/:taskKey",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "onboarding", ":taskKey"],
+              "variable": [{ "key": "taskKey", "value": "exploreServices" }]
             }
           },
           "response": []
@@ -371,6 +474,48 @@
                 "description": "Delete admin user (SUPER_ADMIN only). Cannot delete if admin has assigned clients."
               },
               "response": []
+            },
+            {
+              "name": "Get Admins For Assignment",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/admins/for-assignment",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "admins",
+                    "for-assignment"
+                  ]
+                },
+                "description": "Minimal list of admins for assigning compliances (SUPER_ADMIN, ADMIN)"
+              },
+              "response": []
+            },
+            {
+              "name": "Get Server Stats",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/servers/stats",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "servers",
+                    "stats"
+                  ]
+                },
+                "description": "Server uptime and stats (SUPER_ADMIN only)"
+              },
+              "response": []
             }
           ]
         },
@@ -473,6 +618,21 @@
               "response": []
             },
             {
+              "name": "Get Addable Users for Company",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/companies/:id/members/addable-users",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "companies", ":id", "members", "addable-users"],
+                  "variable": [{ "key": "id", "value": "", "description": "Company ID" }]
+                },
+                "description": "Get users who are not yet members of this company (ADMIN, SUPER_ADMIN only)"
+              },
+              "response": []
+            },
+            {
               "name": "Delete User",
               "request": {
                 "method": "DELETE",
@@ -500,6 +660,37 @@
               "response": []
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Report Overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/overview",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "overview"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "High Risk Compliances",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/high-risk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "high-risk"]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -1029,49 +1220,78 @@
           "response": []
         },
         {
-          "name": "Update Member Role",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"role\": \"VIEWER\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/companies/:id/members/:userId/role",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "companies",
-                ":id",
-                "members",
-                ":userId",
-                "role"
-              ],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "65f1234567890abcdef12345",
-                  "description": "Company ID"
+              "name": "Update Member Role",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"role\": \"VIEWER\"\n}"
                 },
-                {
-                  "key": "userId",
-                  "value": "65f1234567890abcdef67890",
-                  "description": "User ID to update"
-                }
-              ]
+                "url": {
+                  "raw": "{{baseUrl}}/api/companies/:id/members/:userId/role",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "companies",
+                    ":id",
+                    "members",
+                    ":userId",
+                    "role"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "65f1234567890abcdef12345",
+                      "description": "Company ID"
+                    },
+                    {
+                      "key": "userId",
+                      "value": "65f1234567890abcdef67890",
+                      "description": "User ID to update"
+                    }
+                  ]
+                },
+                "description": "Update member role\n- SUPER_ADMIN: any company\n- ADMIN: companies of assigned clients\n- USER (OWNER): their companies only\n\nRoles: OWNER, EDITOR, VIEWER\nNote: Cannot downgrade last OWNER"
+              },
+              "response": []
             },
-            "description": "Update member role\n- SUPER_ADMIN: any company\n- ADMIN: companies of assigned clients\n- USER (OWNER): their companies only\n\nRoles: OWNER, EDITOR, VIEWER\nNote: Cannot downgrade last OWNER"
-          },
-          "response": []
-        }
+            {
+              "name": "Get Addable Users",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/companies/:id/members/addable-users",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "companies",
+                    ":id",
+                    "members",
+                    "addable-users"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "65f1234567890abcdef12345",
+                      "description": "Company ID"
+                    }
+                  ]
+                },
+                "description": "Get users that can be added as company members"
+              },
+              "response": []
+            }
       ]
     },
     {
@@ -1123,6 +1343,74 @@
                   ]
                 },
                 "description": "Get compliance statistics for the dashboard"
+              },
+              "response": []
+            },
+            {
+              "name": "Update Compliance",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"PENDING\",\n  \"assignedTo\": \"admin_user_id_here\",\n  \"expertName\": \"Expert Name\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/compliances/:id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "compliances",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "",
+                      "description": "Compliance ID"
+                    }
+                  ]
+                },
+                "description": "Update compliance status or assignment (SUPER_ADMIN, ADMIN)"
+              },
+              "response": []
+            },
+            {
+              "name": "Bulk Delete Compliances",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ids\": [\"id1\", \"id2\"]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/compliances/bulk",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "compliances", "bulk"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "List Compliance Templates",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/compliances/templates",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "compliances", "templates"]
+                }
               },
               "response": []
             }
@@ -1179,6 +1467,89 @@
             }
           ]
         }
+      ]
+    },
+    {
+      "name": "Phase 2.5 - Consultations",
+      "item": [
+        {
+          "name": "Book Consultation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"GST Filing\",\n  \"date\": \"2026-03-10\",\n  \"time\": \"10:00\",\n  \"notes\": \"Provide details\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/consultations/book",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","consultations","book"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"otp\": \"123456\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/consultations/:id/verify-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","consultations",":id","verify-otp"],
+              "variable": [{ "key": "id", "value": "", "description": "Consultation ID" }]
+            }
+          },
+          "response": []
+        },
+        { "name": "My Consultations", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/api/consultations", "host": ["{{baseUrl}}"], "path": ["api","consultations"] } }, "response": [] },
+        { "name": "Get Consultation by ID", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/api/consultations/:id", "host": ["{{baseUrl}}"], "path": ["api","consultations",":id"], "variable": [{ "key": "id", "value": "", "description": "Consultation ID" }] } }, "response": [] },
+        { "name": "Add Message", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"content\": \"Hello\"\n}"}, "url": { "raw": "{{baseUrl}}/api/consultations/:id/messages", "host": ["{{baseUrl}}"], "path": ["api","consultations",":id","messages"], "variable": [{"key":"id","value":"","description":"Consultation ID"}] } }, "response": [] },
+        { "name": "Assign Expert", "request": { "method": "PATCH", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"expertId\": \"admin_user_id_here\"\n}"}, "url": { "raw": "{{baseUrl}}/api/consultations/:id/assign", "host": ["{{baseUrl}}"], "path": ["api","consultations",":id","assign"], "variable": [{"key":"id","value":"","description":"Consultation ID"}] } }, "response": [] },
+        { "name": "Update Status", "request": { "method": "PATCH", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"status\": \"SCHEDULED\"\n}"}, "url": { "raw": "{{baseUrl}}/api/consultations/:id/status", "host": ["{{baseUrl}}"], "path": ["api","consultations",":id","status"], "variable": [{"key":"id","value":"","description":"Consultation ID"}] } }, "response": [] }
+      ]
+    },
+    {
+      "name": "Phase 2.6 - Reports",
+      "item": [
+        { "name": "Reports Overview", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/api/reports/overview", "host": ["{{baseUrl}}"], "path": ["api","reports","overview"] } }, "response": [] },
+        { "name": "High Risk Compliances", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/api/reports/high-risk", "host": ["{{baseUrl}}"], "path": ["api","reports","high-risk"] } }, "response": [] }
+      ]
+    },
+    {
+      "name": "Phase 2.7 - Documents",
+      "item": [
+        {
+          "name": "Upload Document",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "" },
+                { "key": "name", "type": "text", "value": "Document.pdf" },
+                { "key": "companyId", "type": "text", "value": "" },
+                { "key": "clientId", "type": "text", "value": "" },
+                { "key": "folder", "type": "text", "value": "General" },
+                { "key": "description", "type": "text", "value": "" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/api/documents/upload", "host": ["{{baseUrl}}"], "path": ["api","documents","upload"] }
+          },
+          "response": []
+        },
+        { "name": "List Documents", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/api/documents?companyId=&clientId=&folder=", "host": ["{{baseUrl}}"], "path": ["api","documents"], "query": [ {"key":"companyId","value":""}, {"key":"clientId","value":""}, {"key":"folder","value":""} ] } }, "response": [] },
+        { "name": "Get Folders", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/api/documents/folders", "host": ["{{baseUrl}}"], "path": ["api","documents","folders"] } }, "response": [] },
+        { "name": "Get Document by ID", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/api/documents/:id", "host": ["{{baseUrl}}"], "path": ["api","documents",":id"], "variable": [{"key":"id","value":"","description":"Document ID"}] } }, "response": [] },
+        { "name": "Update Document", "request": { "method": "PATCH", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"name\": \"New Name\",\n  \"folder\": \"Finance\",\n  \"description\": \"Updated\"\n}"}, "url": { "raw": "{{baseUrl}}/api/documents/:id", "host": ["{{baseUrl}}"], "path": ["api","documents",":id"], "variable": [{"key":"id","value":"","description":"Document ID"}] } }, "response": [] },
+        { "name": "Delete Document", "request": { "method": "DELETE", "header": [], "url": { "raw": "{{baseUrl}}/api/documents/:id", "host": ["{{baseUrl}}"], "path": ["api","documents",":id"], "variable": [{"key":"id","value":"","description":"Document ID"}] } }, "response": [] }
       ]
     }
   ],

@@ -23,6 +23,7 @@ const {
 router.use(protect);
 
 // Admin-specific routes (MUST come before generic /:id routes)
+router.get('/admins/for-assignment', checkRole('SUPER_ADMIN', 'ADMIN'), require('../controllers/userController').getAdminsForAssignment);
 router.get('/admins', checkRole('SUPER_ADMIN'), getAllAdmins);
 router.post('/admins', checkRole('SUPER_ADMIN'), validateRequest(createAdminSchema), createAdmin);
 router.get('/admins/:id', checkRole('SUPER_ADMIN'), getUserById);

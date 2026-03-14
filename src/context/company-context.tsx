@@ -1,305 +1,279 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
 import { Company, CompanyStats, CompanyFilters } from "@/types"
 import companyService from "@/services/companyService"
-import { toast } from "sonner" // or your toast library
-import { useAuth } from "./auth-context" // Import your auth context
+import { toast } from "sonner"
+import { useAuth } from "./auth-context"
+import { ROLES } from "@/lib/roles"
 
 interface CompanyContextType {
-    // State
     selectedCompany: Company | null
     companies: Company[]
     stats: CompanyStats | null
     loading: boolean
     error: string | null
-
-    // Actions
+    filters: CompanyFilters
+    setFilters: React.Dispatch<React.SetStateAction<CompanyFilters>>
+    pagination: { page: number; limit: number; totalPages: number; totalCount: number }
+    setPage: (page: number) => void
     setSelectedCompany: (company: Company | null) => void
-    fetchCompanies: (filters?: CompanyFilters) => Promise<void>
-    fetchStats: () => Promise<void>
+    fetchCompanies: (force?: boolean, filters?: CompanyFilters) => Promise<void>
+    fetchStats: (force?: boolean) => Promise<void>
     createCompany: (data: any) => Promise<Company | null>
     updateCompany: (id: string, data: any) => Promise<Company | null>
     deleteCompany: (id: string) => Promise<boolean>
-    addMember: (companyId: string, userId: string, role: 'OWNER' | 'EDITOR' | 'VIEWER') => Promise<boolean>
+    addMember: (companyId: string, userId: string, role: "OWNER" | "EDITOR" | "VIEWER") => Promise<boolean>
     removeMember: (companyId: string, userId: string) => Promise<boolean>
-    updateMemberRole: (companyId: string, userId: string, role: 'OWNER' | 'EDITOR' | 'VIEWER') => Promise<boolean>
-    refreshCompanies: () => Promise<void>
+    updateMemberRole: (companyId: string, userId: string, role: "OWNER" | "EDITOR" | "VIEWER") => Promise<boolean>
+    refreshAll: (force?: boolean) => Promise<void>
+    getAddableUsers: (companyId: string) => Promise<any[]>
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined)
 
+const CACHE_DURATION = 30000; // 30 seconds
+
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
-    const { user } = useAuth() // Get logged-in user
+    const { user, isAuthenticated } = useAuth()
 
     const [selectedCompany, setSelectedCompanyState] = useState<Company | null>(null)
     const [companies, setCompanies] = useState<Company[]>([])
     const [stats, setStats] = useState<CompanyStats | null>(null)
     const [loading, setLoading] = useState<boolean>(false)
     const [error, setError] = useState<string | null>(null)
+    const [filters, setFilters] = useState<CompanyFilters>({})
+    const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1, totalCount: 0 })
 
-    // Cache to prevent duplicate API calls
-    const [lastFetchTime, setLastFetchTime] = useState<number>(0)
-    const CACHE_DURATION = 30000 // 30 seconds
+    const setPage = useCallback((page: number) => {
+        setPagination(prev => ({ ...prev, page }))
+    }, [])
+
+    const lastFetchTime = useRef<{ companies: number; stats: number }>({ companies: 0, stats: 0 });
+    const isFetching = useRef<{ companies: boolean; stats: boolean }>({ companies: false, stats: false });
 
     // ========================================
     // Fetch Companies (Optimized with Cache)
     // ========================================
-    const fetchCompanies = useCallback(async (filters?: CompanyFilters) => {
-        // Prevent duplicate calls within cache duration
+    // ========================================
+    const fetchCompanies = useCallback(async (force: boolean = false, customFilters?: CompanyFilters) => {
         const now = Date.now()
-        if (!filters && now - lastFetchTime < CACHE_DURATION) {
-            return // Use cached data
+        const activeFilters = { ...pagination, ...filters, ...(customFilters || {}) };
+
+        if (!force && !customFilters && now - lastFetchTime.current.companies < CACHE_DURATION && companies.length > 0) {
+            return
         }
+
+        if (isFetching.current.companies) return;
+        isFetching.current.companies = true;
 
         setLoading(true)
         setError(null)
 
         try {
-            const { companies: fetchedCompanies } = await companyService.getAllCompanies(filters)
-            setCompanies(fetchedCompanies)
-            setLastFetchTime(now)
+            const response = await companyService.getAllCompanies(activeFilters)
+            setCompanies(response.companies)
+            setPagination(prev => ({
+                ...prev,
+                totalPages: response.totalPages || 1,
+                totalCount: response.count || 0
+            }))
+            lastFetchTime.current.companies = Date.now()
 
-            // Auto-select first company if none selected
-            if (!selectedCompany && fetchedCompanies.length > 0) {
-                setSelectedCompanyState(fetchedCompanies[0])
-            }
+            // Logic to auto-select first company was removed here to honor 'All My Companies' as default.
 
-            // If selected company is in the list, update it with fresh data
-            if (selectedCompany) {
-                const updatedSelected = fetchedCompanies.find(c => c._id === selectedCompany._id)
-                if (updatedSelected) {
-                    setSelectedCompanyState(updatedSelected)
-                }
-            }
+            // Sync selected company if fresh data available
+            setSelectedCompanyState(prev => {
+                if (!prev) return prev;
+                const updated = response.companies.find((c: Company) => c._id === prev._id);
+                return updated || prev;
+            });
         } catch (err: any) {
             const errorMsg = err?.response?.data?.message || "Failed to fetch companies"
             setError(errorMsg)
-            toast.error(errorMsg)
+            if (force) toast.error(errorMsg)
         } finally {
             setLoading(false)
+            isFetching.current.companies = false;
         }
-    }, [selectedCompany, lastFetchTime])
+    }, [filters, pagination.page, pagination.limit])
 
     // ========================================
     // Fetch Stats (Only for SUPER_ADMIN/ADMIN)
     // ========================================
-    const fetchStats = useCallback(async () => {
-        if (user?.role !== 'SUPER_ADMIN' && user?.role !== 'ADMIN') {
-            return // Stats only for admins
+    const fetchStats = useCallback(async (force: boolean = false) => {
+        if (user?.role !== ROLES.SUPER_ADMIN && user?.role !== ROLES.ADMIN) {
+            return
         }
+
+        const now = Date.now();
+        if (!force && now - lastFetchTime.current.stats < CACHE_DURATION && stats !== null) {
+            return;
+        }
+
+        if (isFetching.current.stats) return;
+        isFetching.current.stats = true;
 
         try {
             const response = await companyService.getStats()
             setStats(response.stats)
+            lastFetchTime.current.stats = Date.now();
         } catch (err: any) {
             console.error('Failed to fetch stats:', err)
-            // Don't show error toast for stats (non-critical)
+        } finally {
+            isFetching.current.stats = false;
         }
     }, [user?.role])
 
+    const refreshAll = useCallback(async (force: boolean = true) => {
+        await Promise.all([
+            fetchCompanies(force),
+            fetchStats(force)
+        ]);
+    }, [fetchCompanies, fetchStats]);
+
     // ========================================
-    // Create Company
+    // Mutations
     // ========================================
     const createCompany = useCallback(async (data: any): Promise<Company | null> => {
         setLoading(true)
         try {
             const response = await companyService.createCompany(data)
-
-            // Add to local state (optimistic update)
-            setCompanies(prev => [response.company, ...prev])
-
-            // Auto-select newly created company
+            await refreshAll(true)
             setSelectedCompanyState(response.company)
-
-            toast.success(response.message || "Company created successfully!")
-
-            // Refresh stats
-            fetchStats()
-
+            toast.success("Company created successfully!")
             return response.company
         } catch (err: any) {
-            const errorMsg = err?.response?.data?.message || "Failed to create company"
-            toast.error(errorMsg)
+            toast.error(err?.response?.data?.message || "Failed to create company")
             return null
         } finally {
             setLoading(false)
         }
-    }, [fetchStats])
+    }, [refreshAll])
 
-    // ========================================
-    // Update Company
-    // ========================================
     const updateCompany = useCallback(async (id: string, data: any): Promise<Company | null> => {
         setLoading(true)
         try {
             const response = await companyService.updateCompany(id, data)
-
-            // Update local state
             setCompanies(prev => prev.map(c => c._id === id ? response.company : c))
-
-            // Update selected if it's the same company
-            if (selectedCompany?._id === id) {
-                setSelectedCompanyState(response.company)
-            }
-
-            toast.success(response.message || "Company updated successfully!")
-
+            if (selectedCompany?._id === id) setSelectedCompanyState(response.company)
+            toast.success("Company updated successfully!")
             return response.company
         } catch (err: any) {
-            const errorMsg = err?.response?.data?.message || "Failed to update company"
-            toast.error(errorMsg)
+            toast.error(err?.response?.data?.message || "Failed to update company")
             return null
         } finally {
             setLoading(false)
         }
     }, [selectedCompany])
 
-    // ========================================
-    // Delete Company
-    // ========================================
     const deleteCompany = useCallback(async (id: string): Promise<boolean> => {
         setLoading(true)
         try {
-            const response = await companyService.deleteCompany(id)
-
-            // Remove from local state
+            await companyService.deleteCompany(id)
             setCompanies(prev => prev.filter(c => c._id !== id))
-
-            // Clear selection if deleted company was selected
-            if (selectedCompany?._id === id) {
-                setSelectedCompanyState(companies[0] || null)
-            }
-
-            toast.success(response.message || "Company deleted successfully!")
-
-            // Refresh stats
-            fetchStats()
-
+            if (selectedCompany?._id === id) setSelectedCompanyState(companies[0] || null)
+            toast.success("Company deleted successfully!")
+            fetchStats(true)
             return true
         } catch (err: any) {
-            const errorMsg = err?.response?.data?.message || "Failed to delete company"
-            toast.error(errorMsg)
+            toast.error(err?.response?.data?.message || "Failed to delete company")
             return false
         } finally {
             setLoading(false)
         }
     }, [selectedCompany, companies, fetchStats])
 
-    // ========================================
-    // Add Member
-    // ========================================
-    const addMember = useCallback(async (companyId: string, userId: string, role: 'OWNER' | 'EDITOR' | 'VIEWER'): Promise<boolean> => {
+    const addMember = useCallback(async (companyId: string, userId: string, role: "OWNER" | "EDITOR" | "VIEWER"): Promise<boolean> => {
         try {
             const response = await companyService.addMember(companyId, { userId, role })
-
-            // Update local state
             setCompanies(prev => prev.map(c => c._id === companyId ? response.company : c))
-
-            if (selectedCompany?._id === companyId) {
-                setSelectedCompanyState(response.company)
-            }
-
-            toast.success(response.message || "Member added successfully!")
+            if (selectedCompany?._id === companyId) setSelectedCompanyState(response.company)
+            toast.success("Member added successfully!")
             return true
         } catch (err: any) {
-            const errorMsg = err?.response?.data?.message || "Failed to add member"
-            toast.error(errorMsg)
+            toast.error(err?.response?.data?.message || "Failed to add member")
             return false
         }
     }, [selectedCompany])
 
-    // ========================================
-    // Remove Member
-    // ========================================
     const removeMember = useCallback(async (companyId: string, userId: string): Promise<boolean> => {
         try {
             const response = await companyService.removeMember(companyId, userId)
-
-            // Update local state
             setCompanies(prev => prev.map(c => c._id === companyId ? response.company : c))
-
-            if (selectedCompany?._id === companyId) {
-                setSelectedCompanyState(response.company)
-            }
-
-            toast.success(response.message || "Member removed successfully!")
+            if (selectedCompany?._id === companyId) setSelectedCompanyState(response.company)
+            toast.success("Member removed successfully!")
             return true
         } catch (err: any) {
-            const errorMsg = err?.response?.data?.message || "Failed to remove member"
-            toast.error(errorMsg)
+            toast.error(err?.response?.data?.message || "Failed to remove member")
             return false
         }
     }, [selectedCompany])
 
-    // ========================================
-    // Update Member Role
-    // ========================================
-    const updateMemberRole = useCallback(async (companyId: string, userId: string, role: 'OWNER' | 'EDITOR' | 'VIEWER'): Promise<boolean> => {
+    const updateMemberRole = useCallback(async (companyId: string, userId: string, role: "OWNER" | "EDITOR" | "VIEWER"): Promise<boolean> => {
         try {
             const response = await companyService.updateMemberRole(companyId, userId, { role })
-
-            // Update local state
             setCompanies(prev => prev.map(c => c._id === companyId ? response.company : c))
-
-            if (selectedCompany?._id === companyId) {
-                setSelectedCompanyState(response.company)
-            }
-
-            toast.success(response.message || "Member role updated successfully!")
+            if (selectedCompany?._id === companyId) setSelectedCompanyState(response.company)
+            toast.success("Member role updated successfully!")
             return true
         } catch (err: any) {
-            const errorMsg = err?.response?.data?.message || "Failed to update member role"
-            toast.error(errorMsg)
+            toast.error(err?.response?.data?.message || "Failed to update member role")
             return false
         }
     }, [selectedCompany])
 
-    // ========================================
-    // Manual Refresh
-    // ========================================
-    const refreshCompanies = useCallback(async () => {
-        setLastFetchTime(0) // Clear cache
-        await fetchCompanies()
-    }, [fetchCompanies])
+    const getAddableUsers = useCallback(async (companyId: string) => {
+        // Double check permissions (USER role is read-only)
+        if (!user || (user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN')) {
+            return [];
+        }
+        
+        try {
+            const { users } = await companyService.getAddableUsers(companyId)
+            return users
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || "Failed to fetch addable users")
+            return []
+        }
+    }, [user])
 
-    // ========================================
-    // Custom setSelectedCompany with validation
-    // ========================================
     const setSelectedCompany = useCallback((company: Company | null) => {
         setSelectedCompanyState(company)
-        // Optionally store in localStorage for persistence
-        if (company) {
-            localStorage.setItem('selectedCompanyId', company._id)
-        } else {
-            localStorage.removeItem('selectedCompanyId')
-        }
+        if (company) localStorage.setItem('selectedCompanyId', company._id)
+        else localStorage.removeItem('selectedCompanyId')
     }, [])
 
-    // ========================================
-    // Initial Fetch (Only once on mount)
-    // ========================================
+    // Effects
     useEffect(() => {
-        if (user) {
-            fetchCompanies()
-            fetchStats()
+        if (!isAuthenticated || !user) {
+            setCompanies([])
+            setStats(null)
+            lastFetchTime.current = { companies: 0, stats: 0 }
+            return
         }
-    }, [user]) // Only run when user changes (login/logout)
+        refreshAll(false)
+    }, [user?._id, isAuthenticated, refreshAll])
 
-    // ========================================
-    // Restore selected company from localStorage
-    // ========================================
+    // Effect for handling filter changes
+    useEffect(() => {
+        if (isAuthenticated && user) {
+            const timer = setTimeout(() => {
+                refreshAll(true);
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [filters, pagination.page, user?.role, isAuthenticated, refreshAll]);
+
     useEffect(() => {
         if (companies.length > 0) {
-            const savedCompanyId = localStorage.getItem('selectedCompanyId')
-            if (savedCompanyId) {
-                const company = companies.find(c => c._id === savedCompanyId)
-                if (company) {
-                    setSelectedCompanyState(company)
-                }
+            const savedId = localStorage.getItem('selectedCompanyId')
+            if (savedId) {
+                const found = companies.find(c => c._id === savedId)
+                if (found) setSelectedCompanyState(found)
             }
         }
-    }, [companies])
+    }, [companies.length])
 
     return (
         <CompanyContext.Provider
@@ -309,6 +283,10 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
                 stats,
                 loading,
                 error,
+                filters,
+                setFilters,
+                pagination,
+                setPage,
                 setSelectedCompany,
                 fetchCompanies,
                 fetchStats,
@@ -318,7 +296,8 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
                 addMember,
                 removeMember,
                 updateMemberRole,
-                refreshCompanies,
+                refreshAll,
+                getAddableUsers,
             }}
         >
             {children}

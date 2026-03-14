@@ -1,6 +1,7 @@
 "use client";
 
 import { useSuperAdmin } from "@/context/super-admin-context";
+import { useConsultation } from "@/context/consultation-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,17 +11,24 @@ import {
     Activity,
     TrendingUp,
     AlertCircle,
-    Clock
+    Clock,
+    CreditCard
 } from "lucide-react";
 
 export default function SuperAdminDashboard() {
     const { admins = [], clients = [], serverStats } = useSuperAdmin();
+    const { consultations = [] } = useConsultation();
 
     // Calculate Global Stats
     const totalAdmins = admins.length;
     const activeAdmins = admins.filter((a: any) => a.status === "ACTIVE").length;
     const totalClients = clients.length;
     const totalPendingWork = clients.reduce((acc: number, curr: any) => acc + (curr.pendingWork || 0), 0);
+
+    // Calculate Revenue
+    const totalRevenue = consultations
+        .filter((c: any) => c.payment?.status === 'PAID')
+        .reduce((acc: number, c: any) => acc + (c.payment?.amount || 0), 0);
 
     // Calculate Platform Health
     const now = new Date();
@@ -29,6 +37,12 @@ export default function SuperAdminDashboard() {
     const newClientsThisMonth = clients.filter((c: any) => {
         const joinedDate = new Date(c.joinedDate || 0);
         return joinedDate >= firstDayOfMonth;
+    }).length;
+
+    const consultationsThisMonth = consultations.filter((c: any) => {
+        if (c.payment?.status !== 'PAID' || !c.payment?.paidAt) return false;
+        const paidDate = new Date(c.payment.paidAt);
+        return paidDate >= firstDayOfMonth;
     }).length;
 
     const avgAdminUtilization = admins.length > 0
@@ -60,6 +74,14 @@ export default function SuperAdminDashboard() {
             bg: "bg-orange-50",
             trend: totalPendingWork > 50 ? "High workload" : "Normal"
         },
+        {
+            title: "Consultation Revenue",
+            value: `₹${totalRevenue.toLocaleString('en-IN')}`,
+            icon: CreditCard,
+            color: "text-emerald-600",
+            bg: "bg-emerald-50",
+            trend: `${consultationsThisMonth} consultations this month`
+        },
     ];
 
     return (
@@ -78,7 +100,7 @@ export default function SuperAdminDashboard() {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {stats.map((stat, i) => (
                     <Card key={i} className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
                         <CardContent className="p-6">

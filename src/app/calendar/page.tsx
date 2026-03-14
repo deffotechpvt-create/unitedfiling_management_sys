@@ -7,12 +7,11 @@ import { MOCK_EVENTS } from "@/components/calendar/mock-data";
 import { ComplianceEvent } from "@/components/calendar/calendar-types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { startOfMonth, format } from "date-fns";
+import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useOnboardingStore } from "@/store/useOnboardingStore";
 import { useRouter } from "next/navigation";
-import { Calendar as CalendarIcon, PlayCircle } from "lucide-react";
-import Image from "next/image"; // Assuming we might use Next Image, or just use text/lucide for now based on description
+import { PlayCircle } from "lucide-react";
 
 function CalendarIntro() {
     const router = useRouter();

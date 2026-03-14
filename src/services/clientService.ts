@@ -53,6 +53,8 @@ export interface UpdateClientData {
     phone?: string;
     status?: 'ACTIVE' | 'INACTIVE';
     assignedAdmin?: string;
+    pendingWork?: number;
+    completedWork?: number;
 }
 
 export interface ClientFilters {
@@ -60,17 +62,21 @@ export interface ClientFilters {
     assignedAdmin?: string | 'unassigned';
     search?: string;
     company?: string;
+    page?: number;
+    limit?: number | 'all';
 }
 
 export const clientService = {
     // Get all clients with optional filters
-    async getAllClients(filters?: ClientFilters): Promise<{ clients: Client[]; message: string }> {
+    async getAllClients(filters?: ClientFilters): Promise<{ clients: Client[]; count: number; totalPages: number; currentPage: number; message: string }> {
         const params = new URLSearchParams();
 
         if (filters?.status) params.append('status', filters.status);
         if (filters?.assignedAdmin) params.append('assignedAdmin', filters.assignedAdmin);
         if (filters?.search) params.append('search', filters.search);
         if (filters?.company) params.append('company', filters.company);
+        if (filters?.page) params.append('page', filters.page.toString());
+        if (filters?.limit) params.append('limit', String(filters.limit));
 
         const queryString = params.toString();
         const url = `/clients${queryString ? `?${queryString}` : ''}`;

@@ -17,6 +17,12 @@ export interface Client {
   updatedAt: string;
 }
 
+export interface OnboardingTasks {
+  exploreServices: boolean;
+  exploreDocuments: boolean;
+  consultExpert: boolean;
+}
+
 export interface User {
   _id: string;
   name: string;
@@ -24,7 +30,8 @@ export interface User {
   phone?: string;
   role: 'SUPER_ADMIN' | 'ADMIN' | 'USER';
   status: 'ACTIVE' | 'INACTIVE';
-  avatarUrl?: string; // Added from your existing type
+  avatarUrl?: string;
+  onboardingTasks?: OnboardingTasks;
 }
 
 export interface LoginCredentials {
@@ -52,6 +59,9 @@ export interface AuthContextType {
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (token: string, password: string) => Promise<void>;
+  updateOnboardingTask: (task: keyof OnboardingTasks, completed?: boolean) => Promise<void>;
   isAuthenticated: boolean;
 }
 export type ComplianceStatus = 'PENDING' | 'DELAYED' | 'COMPLETED' | 'FILING_DONE';

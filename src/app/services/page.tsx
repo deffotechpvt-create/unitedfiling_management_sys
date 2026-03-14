@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { useService } from "@/context/service-context"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useAuth } from "@/context/auth-context"
+import { Tabs,  TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Sparkles } from "lucide-react"
 import { ServiceSheet } from "@/components/services/service-sheet"
@@ -15,12 +15,16 @@ const CATEGORIES = ["All", "Licenses", "Trademarks", "Company Changes", "Taxatio
 
 export default function ServicesPage() {
     const { services, loading: isLoading, fetchServices } = useService();
+    const { updateOnboardingTask ,user} = useAuth();
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [selectedService, setSelectedService] = useState<Service | null>(null);
 
     useEffect(() => {
         fetchServices();
-    }, [fetchServices]);
+        if (user?.onboardingTasks && !user.onboardingTasks.exploreServices) {
+            updateOnboardingTask('exploreServices');
+        }
+    }, [fetchServices, updateOnboardingTask, user?.onboardingTasks]);
 
     const displayServices = services;
 

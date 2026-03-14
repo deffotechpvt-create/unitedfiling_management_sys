@@ -1,11 +1,11 @@
 // src/context/client-context.tsx
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, use } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { clientService, Client, ClientStats, CreateClientData, UpdateClientData, ClientFilters } from "@/services/clientService";
 import { toast } from "sonner";
 import { useAuth } from "./auth-context";
-import { useCompany } from "./company-context";
+import { canManageClients, ROLES } from "@/lib/roles";
 
 interface ClientContextType {
     clients: Client[];
@@ -14,9 +14,10 @@ interface ClientContextType {
     loading: boolean;
     error: string | null;
     filters: ClientFilters;
+    pagination: { page: number; limit: number; totalPages: number; totalCount: number };
 
     // CRUD operations
-    getAllClients: (filters?: ClientFilters) => Promise<void>;
+    getAllClients: (force?: boolean, filters?: ClientFilters) => Promise<void>;
     getClientById: (clientId: string) => Promise<void>;
     createClient: (data: CreateClientData) => Promise<void>;
     updateClient: (clientId: string, data: UpdateClientData) => Promise<void>;
@@ -28,16 +29,19 @@ interface ClientContextType {
     getUnassignedClients: () => Promise<void>;
 
     // Statistics
-    getClientStats: () => Promise<void>;
+    getClientStats: (force?: boolean) => Promise<void>;
 
     // Filters and selection
-    setFilters: (filters: ClientFilters) => void;
+    setFilters: (filters: ClientFilters | ((prev: ClientFilters) => ClientFilters)) => void;
+    setPage: (page: number) => void;
     setSelectedClient: (client: Client | null) => void;
     clearError: () => void;
-    refreshClients: () => Promise<void>;
+    refreshAll: (force?: boolean) => Promise<void>;
 }
 
 const ClientContext = createContext<ClientContextType | undefined>(undefined);
+
+const CACHE_DURATION = 60000; // 1 minute
 
 export function ClientProvider({ children }: { children: React.ReactNode }) {
     const [clients, setClients] = useState<Client[]>([]);
@@ -45,71 +49,54 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
     const [stats, setStats] = useState<ClientStats | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [filters, setFilters] = useState<ClientFilters>({});
-    const [initialized, setInitialized] = useState(false);
-    const { user } = useAuth();
-    const { selectedCompany } = useCompany();
+    const [filters, setFiltersState] = useState<ClientFilters>({});
+    const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1, totalCount: 0 });
+    
+    const { user, isAuthenticated } = useAuth();
 
-    // ✅ DECOUPLED: Automatic company sync removed. 
-    // Filtering is now handled manually by specific pages (Manage Clients) 
-    // to keep Dashboards global for ADMIN/SUPER_ADMIN.
-    /*
-    useEffect(() => {
-        if (selectedCompany?._id) {
-            setFilters(prev => ({ ...prev, company: selectedCompany._id }));
-        } else {
-            setFilters(prev => {
-                const newFilters = { ...prev };
-                delete newFilters.company;
-                return newFilters;
-            });
+    const lastFetchTime = useRef<{ clients: number; stats: number }>({ clients: 0, stats: 0 });
+    const isFetching = useRef<{ clients: boolean; stats: boolean }>({ clients: false, stats: false });
+
+    const getAllClients = useCallback(async (force: boolean = false, filterParams?: ClientFilters) => {
+        const now = Date.now();
+        const activeFilters = { ...pagination, ...(filterParams || filters) }; // mix in page and limit
+
+        // Cache skip logic
+        if (!force && !filterParams && now - lastFetchTime.current.clients < CACHE_DURATION && clients.length > 0) {
+            return;
         }
-    }, [selectedCompany?._id]);
-    */
 
-    // Load clients on mount and when filters change
-    useEffect(() => {
-        if (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") {
-            if (!initialized) {
-                getAllClients(filters);
-                getClientStats();
-                setInitialized(true);
-            }
-        }
-    }, [user?.role, initialized]);
+        if (isFetching.current.clients) return;
+        isFetching.current.clients = true;
 
-    // ✅ Reload ONLY when filters change (NOT on mount)
-    useEffect(() => {
-        if (initialized && (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN")) {
-            getAllClients(filters);
-            getClientStats(); // Also refresh stats when filters change (company)
-        }
-    }, [filters]);
-
-
-
-    const getAllClients = async (filterParams?: ClientFilters) => {
         try {
             setError(null);
             setLoading(true);
 
-            const response = await clientService.getAllClients(filterParams || filters);
+            const response = await clientService.getAllClients(activeFilters);
 
             if (response.clients) {
                 setClients(response.clients);
+                setPagination(prev => ({
+                    ...prev,
+                    totalPages: response.totalPages || 1,
+                    totalCount: response.count || 0
+                }));
+                lastFetchTime.current.clients = Date.now();
             } else {
                 throw new Error(response.message || "Failed to fetch clients");
             }
         } catch (err: any) {
             const errorMessage = err.response?.data?.message || err.message || "Failed to fetch clients";
             setError(errorMessage);
-            toast.error(errorMessage);
+            if (force) toast.error(errorMessage);
         } finally {
             setLoading(false);
+            isFetching.current.clients = false;
         }
-    };
+    }, [filters, pagination.page, pagination.limit]);
 
-    const getClientById = async (clientId: string) => {
+    const getClientById = useCallback(async (clientId: string) => {
         try {
             setError(null);
             setLoading(true);
@@ -128,21 +115,81 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    const getClientStats = useCallback(async (force: boolean = false) => {
+        const now = Date.now();
+        if (!force && now - lastFetchTime.current.stats < CACHE_DURATION && stats !== null) {
+            return;
+        }
+
+        if (isFetching.current.stats) return;
+        isFetching.current.stats = true;
+
+        try {
+            setError(null);
+            const response = await clientService.getClientStats(filters.company);
+
+            if (response.stats) {
+                setStats(response.stats);
+                lastFetchTime.current.stats = Date.now();
+            } else {
+                throw new Error(response.message || "Failed to fetch statistics");
+            }
+        } catch (err: any) {
+            console.error("Failed to fetch client stats", err);
+        } finally {
+            isFetching.current.stats = false;
+        }
+    }, [filters.company]);
+
+    const refreshAll = useCallback(async (force: boolean = true) => {
+        await Promise.all([
+            getAllClients(force),
+            getClientStats(force)
+        ]);
+    }, [getAllClients, getClientStats]);
+
+    const setFilters = useCallback((newFilters: ClientFilters | ((prev: ClientFilters) => ClientFilters)) => {
+        setFiltersState(newFilters);
+        setPagination(prev => ({ ...prev, page: 1 })); // reset page on filter change
+    }, []);
+
+    const setPage = useCallback((page: number) => {
+        setPagination(prev => ({ ...prev, page }));
+    }, []);
+
+    // Effect for handling initial load and role/auth changes
+    useEffect(() => {
+        if (!isAuthenticated || !user || !canManageClients(user.role)) {
+            setClients([]);
+            setStats(null);
+            lastFetchTime.current = { clients: 0, stats: 0 };
+            return;
+        }
+
+        refreshAll(false);
+    }, [user?._id, user?.role, isAuthenticated, refreshAll]);
+
+    // Effect for handling filter changes
+    useEffect(() => {
+        if (isAuthenticated && user && canManageClients(user.role)) {
+            // Proper debounce for search typing and filter changes
+            const timer = setTimeout(() => {
+                refreshAll(true);
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [filters, pagination.page, user?.role, isAuthenticated, refreshAll]);
+
 
     const createClient = async (data: CreateClientData) => {
         try {
             setError(null);
             setLoading(true);
-
-            const response = await clientService.createClient(data);
-
-            if (response.client) {
-                toast.success(response.message || "Client created successfully");
-                await refreshClients();
-            } else {
-                throw new Error(response.message || "Failed to create client");
-            }
+            await clientService.createClient(data);
+            toast.success("Client created successfully");
+            refreshAll(true);
         } catch (err: any) {
             const errorMessage = err.response?.data?.message || err.message || "Failed to create client";
             setError(errorMessage);
@@ -157,19 +204,11 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
         try {
             setError(null);
             setLoading(true);
-
             const response = await clientService.updateClient(clientId, data);
-
+            toast.success("Client updated successfully");
+            refreshAll(true);
             if (response.client) {
-                toast.success(response.message || "Client updated successfully");
-                await refreshClients();
-
-                // Update selected client if it's the one being updated
-                if (selectedClient?._id === clientId) {
-                    setSelectedClient(response.client);
-                }
-            } else {
-                throw new Error(response.message || "Failed to update client");
+                setSelectedClient(prev => prev?._id === clientId ? response.client : prev);
             }
         } catch (err: any) {
             const errorMessage = err.response?.data?.message || err.message || "Failed to update client";
@@ -185,13 +224,9 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
         try {
             setError(null);
             setLoading(true);
-
-            const response = await clientService.deleteClient(clientId);
-
-            toast.success(response.message || "Client deleted successfully");
-            await refreshClients();
-
-            // Clear selected client if it was deleted
+            await clientService.deleteClient(clientId);
+            toast.success("Client deleted successfully");
+            refreshAll(true);
             if (selectedClient?._id === clientId) {
                 setSelectedClient(null);
             }
@@ -209,20 +244,9 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
         try {
             setError(null);
             setLoading(true);
-
-            const response = await clientService.assignClientToAdmin(clientId, adminId);
-
-            if (response.client) {
-                toast.success(response.message || "Client assigned successfully");
-                await refreshClients();
-
-                // Update selected client if it's the one being assigned
-                if (selectedClient?._id === clientId) {
-                    setSelectedClient(response.client);
-                }
-            } else {
-                throw new Error(response.message || "Failed to assign client");
-            }
+            await clientService.assignClientToAdmin(clientId, adminId);
+            toast.success("Client assigned successfully");
+            refreshAll(true);
         } catch (err: any) {
             const errorMessage = err.response?.data?.message || err.message || "Failed to assign client";
             setError(errorMessage);
@@ -237,20 +261,9 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
         try {
             setError(null);
             setLoading(true);
-
-            const response = await clientService.unassignClient(clientId);
-
-            if (response.client) {
-                toast.success(response.message || "Client unassigned successfully");
-                await refreshClients();
-
-                // Update selected client if it's the one being unassigned
-                if (selectedClient?._id === clientId) {
-                    setSelectedClient(response.client);
-                }
-            } else {
-                throw new Error(response.message || "Failed to unassign client");
-            }
+            await clientService.unassignClient(clientId);
+            toast.success("Client unassigned successfully");
+            refreshAll(true);
         } catch (err: any) {
             const errorMessage = err.response?.data?.message || err.message || "Failed to unassign client";
             setError(errorMessage);
@@ -265,13 +278,11 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
         try {
             setError(null);
             setLoading(true);
-
             const response = await clientService.getUnassignedClients();
-
             if (response.clients) {
                 setClients(response.clients);
             } else {
-                throw new Error(response.message || "Failed to fetch unassigned clients");
+                throw new Error("Failed to fetch unassigned clients");
             }
         } catch (err: any) {
             const errorMessage = err.response?.data?.message || err.message || "Failed to fetch unassigned clients";
@@ -282,32 +293,9 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const getClientStats = async () => {
-        try {
-            setError(null);
-
-            const response = await clientService.getClientStats(filters.company);
-
-            if (response.stats) {
-                setStats(response.stats);
-            } else {
-                throw new Error(response.message || "Failed to fetch statistics");
-            }
-        } catch (err: any) {
-            const errorMessage = err.response?.data?.message || err.message || "Failed to fetch statistics";
-            setError(errorMessage);
-            console.error(errorMessage);
-        }
-    };
-
-    const refreshClients = async () => {
-        await getAllClients(filters);
-        await getClientStats();
-    };
-
-    const clearError = () => {
+    const clearError = useCallback(() => {
         setError(null);
-    };
+    }, []);
 
     const value: ClientContextType = {
         clients,
@@ -316,6 +304,7 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
         loading,
         error,
         filters,
+        pagination,
         getAllClients,
         getClientById,
         createClient,
@@ -326,9 +315,10 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
         getUnassignedClients,
         getClientStats,
         setFilters,
+        setPage,
         setSelectedClient,
         clearError,
-        refreshClients,
+        refreshAll,
     };
 
     return <ClientContext.Provider value={value}>{children}</ClientContext.Provider>;

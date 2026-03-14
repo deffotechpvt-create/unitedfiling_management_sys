@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/auth-context";
-import { ShieldCheck, User, ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { ShieldCheck, User, ArrowRight, AlertCircle, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { PasswordStrengthIndicator, validatePassword } from "@/components/ui/PasswordStrengthIndicator";
 
 export default function LoginPage() {
-    const { login, register, loading, error } = useAuth();
+    const { login, register, forgotPassword, loading, error } = useAuth();
     const [isSignUp, setIsSignUp] = useState(false);
+    const [isForgotPassword, setIsForgotPassword] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [name, setName] = useState("");
@@ -19,6 +20,7 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [phoneError, setPhoneError] = useState("");
     const [phoneFlag, setPhoneFlag] = useState(false); // Local loading state for form submission
+    const [forgotSuccess, setForgotSuccess] = useState(false);
     const handlePhoneChange = (value: string) => {
         setPhone(value);
 
@@ -46,6 +48,17 @@ export default function LoginPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setFormError("");
+        setForgotSuccess(false);
+
+        if (isForgotPassword) {
+            try {
+                await forgotPassword(email);
+                setForgotSuccess(true);
+            } catch (err: any) {
+                setFormError(err.message);
+            }
+            return;
+        }
 
         // ✅ Validate password strength for signup
         if (isSignUp) {
@@ -112,20 +125,31 @@ export default function LoginPage() {
                 <div className="mx-auto grid w-full max-w-[400px] gap-6">
                     <div className="grid gap-2 text-center lg:text-left">
                         <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-                            {isSignUp ? "Create an account" : "Welcome back"}
+                            {isForgotPassword 
+                                ? "Reset your password" 
+                                : isSignUp ? "Create an account" : "Welcome back"}
                         </h1>
                         <p className="text-slate-500">
-                            {isSignUp
-                                ? "Enter your details below to create your account"
-                                : "Enter your credentials to access your dashboard"}
+                            {isForgotPassword
+                                ? "Enter your email address and we'll send you a link to reset your password"
+                                : isSignUp
+                                    ? "Enter your details below to create your account"
+                                    : "Enter your credentials to access your dashboard"}
                         </p>
                     </div>
 
-                    {/* Error Display */}
+                    {/* Success/Error Display */}
                     {(formError || error) && (
                         <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md text-red-800">
                             <AlertCircle className="h-4 w-4 flex-shrink-0" />
                             <p className="text-sm">{formError || error}</p>
+                        </div>
+                    )}
+
+                    {forgotSuccess && (
+                        <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md text-green-800">
+                            <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                            <p className="text-sm">Password reset link has been sent to your email.</p>
                         </div>
                     )}
 
@@ -177,48 +201,56 @@ export default function LoginPage() {
                             </div>
                         )}
 
-                        {/* ✅ Password Field with Show/Hide Toggle and Strength Indicator */}
-                        <div className="grid gap-2">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="password">Password</Label>
-                                {!isSignUp && (
-                                    <a href="#" className="text-sm font-medium text-blue-600 hover:text-blue-500">
-                                        Forgot password?
-                                    </a>
+                        {!isForgotPassword && (
+                            <div className="grid gap-2">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="password">Password</Label>
+                                    {!isSignUp && (
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                setIsForgotPassword(true);
+                                                setFormError("");
+                                            }}
+                                            className="text-sm font-medium text-blue-600 hover:text-blue-500"
+                                        >
+                                            Forgot password?
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Password Input with Eye Toggle */}
+                                <div className="relative">
+                                    <Input
+                                        id="password"
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="••••••••"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        required
+                                        disabled={loading}
+                                        className="pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                                        disabled={loading}
+                                    >
+                                        {showPassword ? (
+                                            <EyeOff className="h-4 w-4" />
+                                        ) : (
+                                            <Eye className="h-4 w-4" />
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* ✅ Password Strength Indicator (Only for Sign Up) */}
+                                {isSignUp && password && (
+                                    <PasswordStrengthIndicator password={password} compact={true} showRules={true} />
                                 )}
                             </div>
-
-                            {/* Password Input with Eye Toggle */}
-                            <div className="relative">
-                                <Input
-                                    id="password"
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="••••••••"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                    disabled={loading}
-                                    className="pr-10"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
-                                    disabled={loading}
-                                >
-                                    {showPassword ? (
-                                        <EyeOff className="h-4 w-4" />
-                                    ) : (
-                                        <Eye className="h-4 w-4" />
-                                    )}
-                                </button>
-                            </div>
-
-                            {/* ✅ Password Strength Indicator (Only for Sign Up) */}
-                            {isSignUp && password && (
-                                <PasswordStrengthIndicator password={password} compact={true} showRules={true} />
-                            )}
-                        </div>
+                        )}
 
                         {/* ✅ Submit Button - Disabled if password invalid during signup */}
                         <Button
@@ -236,11 +268,11 @@ export default function LoginPage() {
                                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                                         ></path>
                                     </svg>
-                                    {isSignUp ? "Creating account..." : "Signing in..."}
+                                    {isForgotPassword ? "Send Reset Link" : isSignUp ? "Creating account..." : "Signing in..."}
                                 </span>
                             ) : (
                                 <>
-                                    {isSignUp ? "Sign Up" : "Sign In"}
+                                    {isForgotPassword ? "Send Reset Link" : isSignUp ? "Sign Up" : "Sign In"}
                                     <ArrowRight className="ml-2 h-4 w-4" />
                                 </>
                             )}
@@ -278,7 +310,7 @@ export default function LoginPage() {
                             onClick={async () => {
                                 setFormError("");
                                 try {
-                                    await login({ email: "admin@example.com", password: "admin123" });
+                                    await login({ email: "rajesh.kumar@unitedfillings.com", password: "Admin@123" });
                                 } catch (err: any) {
                                     setFormError(err.message);
                                 }
@@ -307,18 +339,34 @@ export default function LoginPage() {
                     </div>
 
                     <div className="text-center text-sm text-slate-500 mt-4">
-                        {isSignUp ? "Already have an account? " : "Don't have an account? "}
-                        <button
-                            onClick={() => {
-                                setIsSignUp(!isSignUp);
-                                setFormError("");
-                                setPassword(""); // Clear password when switching
-                            }}
-                            className="font-medium text-blue-600 hover:text-blue-500 hover:underline"
-                            disabled={loading}
-                        >
-                            {isSignUp ? "Sign In" : "Sign Up"}
-                        </button>
+                        {isForgotPassword ? (
+                             <button
+                                onClick={() => {
+                                    setIsForgotPassword(false);
+                                    setFormError("");
+                                    setForgotSuccess(false);
+                                }}
+                                className="font-medium text-blue-600 hover:text-blue-500 hover:underline"
+                                disabled={loading}
+                            >
+                                Back to Sign In
+                            </button>
+                        ) : (
+                            <>
+                                {isSignUp ? "Already have an account? " : "Don't have an account? "}
+                                <button
+                                    onClick={() => {
+                                        setIsSignUp(!isSignUp);
+                                        setFormError("");
+                                        setPassword(""); // Clear password when switching
+                                    }}
+                                    className="font-medium text-blue-600 hover:text-blue-500 hover:underline"
+                                    disabled={loading}
+                                >
+                                    {isSignUp ? "Sign In" : "Sign Up"}
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

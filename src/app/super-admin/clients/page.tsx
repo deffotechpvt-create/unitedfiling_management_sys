@@ -32,9 +32,10 @@ import { Users, Search, Download, Plus, Pencil, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useClient } from "@/context/client-context";
 import { useCompany } from "@/context/company-context";
-import { userService } from "@/services/userService";
+import { useSuperAdmin } from "@/context/super-admin-context";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { downloadCSV } from "@/lib/export";
 
 export default function ClientListPage() {
     const {
@@ -42,30 +43,18 @@ export default function ClientListPage() {
         stats,
         loading,
         filters,
+        pagination,
+        setPage,
         setFilters,
         createClient,
         updateClient,
         deleteClient,
         assignClientToAdmin,
         unassignClient,
-        refreshClients,
+        refreshAll: refreshClients,
     } = useClient();
     const { selectedCompany } = useCompany();
-
-    // ✅ Manually sync global company filter to this specific page
-    useEffect(() => {
-        if (selectedCompany?._id) {
-            setFilters({ ...filters, company: selectedCompany._id });
-        } else {
-            const { company, ...rest } = filters;
-            setFilters(rest);
-        }
-    }, [selectedCompany?._id]);
-
-    const [admins, setAdmins] = useState<any[]>([]);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [statusFilter, setStatusFilter] = useState<string>("all");
-    const [adminFilter, setAdminFilter] = useState<string>("all");
+    const { admins, refreshAdmins } = useSuperAdmin();
 
     // Dialog State
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -76,38 +65,51 @@ export default function ClientListPage() {
         email: "",
         phone: "",
         assignedAdmin: "",
+        pendingWork: 0,
+        completedWork: 0,
     });
 
-    // Load admins on mount
+    // ✅ Manually sync global company filter to this specific page
     useEffect(() => {
-        loadAdmins();
-    }, []);
-
-    const loadAdmins = async () => {
-        try {
-            const response = await userService.getAllAdmins();
-            setAdmins(response.admins || []);
-        } catch (error) {
-            console.error("Failed to load admins:", error);
+        if (selectedCompany?._id) {
+            setFilters({ ...filters, company: selectedCompany._id });
+        } else {
+            const { company, ...rest } = filters;
+            setFilters(rest || {});
         }
+    }, [selectedCompany?._id]);
+
+    const [localSearch, setLocalSearch] = useState(filters.search || "");
+
+    // Handle search Input debounce
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (localSearch !== filters.search) {
+                setFilters(prev => ({ ...prev, search: localSearch }));
+            }
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [localSearch]);
+
+    const handleStatusChange = (val: string) => {
+        setFilters(prev => {
+            if (val === "all") {
+                const { status, ...rest } = prev;
+                return rest;
+            }
+            return { ...prev, status: val as 'ACTIVE' | 'INACTIVE' };
+        });
     };
 
-    // Apply filters
-    const filteredClients = clients.filter((client) => {
-        const matchesSearch =
-            client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            client.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            client.email?.toLowerCase().includes(searchQuery.toLowerCase());
-
-        const matchesStatus = statusFilter === "all" || client.status === statusFilter;
-
-        const matchesAdmin =
-            adminFilter === "all" ||
-            (adminFilter === "unassigned" && !client.assignedAdmin) ||
-            client.assignedAdmin?._id === adminFilter;
-
-        return matchesSearch && matchesStatus && matchesAdmin;
-    });
+    const handleAdminChange = (val: string) => {
+        setFilters(prev => {
+            if (val === "all") {
+                const { assignedAdmin, ...rest } = prev;
+                return rest;
+            }
+            return { ...prev, assignedAdmin: val };
+        });
+    };
 
     const handleAssignChange = async (clientId: string, val: string) => {
         try {
@@ -129,6 +131,8 @@ export default function ClientListPage() {
             email: "",
             phone: "",
             assignedAdmin: "",
+            pendingWork: 0,
+            completedWork: 0,
         });
         setIsDialogOpen(true);
     };
@@ -141,6 +145,8 @@ export default function ClientListPage() {
             email: client.email || "",
             phone: client.phone || "",
             assignedAdmin: client.assignedAdmin?._id || "",
+            pendingWork: client.pendingWork || 0,
+            completedWork: client.completedWork || 0,
         });
         setIsDialogOpen(true);
     };
@@ -156,6 +162,8 @@ export default function ClientListPage() {
                     email: formData.email,
                     phone: formData.phone,
                     assignedAdmin: formData.assignedAdmin || undefined,
+                    pendingWork: formData.pendingWork,
+                    completedWork: formData.completedWork,
                 });
             } else {
                 await createClient({
@@ -164,6 +172,8 @@ export default function ClientListPage() {
                     email: formData.email,
                     phone: formData.phone,
                     assignedAdmin: formData.assignedAdmin || undefined,
+                    // Note: Create endpoint might not support pendingWork/completedWork out of the box,
+                    // but usually defaults to 0. If it does, we pass it.
                 });
             }
             setIsDialogOpen(false);
@@ -188,6 +198,28 @@ export default function ClientListPage() {
             month: "short",
             year: "numeric",
         });
+    };
+
+    const handleExport = async () => {
+        try {
+            const { clientService } = await import("@/services/clientService");
+            const response = await clientService.getAllClients({ ...filters, limit: 'all' });
+            
+            const exportData = response.clients.map((client: any) => ({
+                "Client Name": client.name,
+                "Company": client.companyName,
+                "Email": client.email || "",
+                "Phone": client.phone || "",
+                "Status": client.status,
+                "Pending Work": client.pendingWork || 0,
+                "Completed Work": client.completedWork || 0,
+                "Assigned Admin": client.assignedAdmin ? client.assignedAdmin.name : "Unassigned",
+                "Joined Date": formatDate(client.joinedDate || client.createdAt)
+            }));
+            downloadCSV(exportData, "super_admin_clients_export");
+        } catch (error) {
+            toast.error("Failed to export clients");
+        }
     };
 
     return (
@@ -261,19 +293,43 @@ export default function ClientListPage() {
                                             <SelectContent>
                                                 <SelectItem value="unassigned">None (Unassigned)</SelectItem>
                                                 {admins
-                                                    .filter((a) => a.status === "ACTIVE")
-                                                    .map((admin) => (
+                                                    .filter((a: any) => a.status === "ACTIVE")
+                                                    .map((admin: any) => (
                                                         <SelectItem
                                                             key={admin.id}
                                                             value={admin.id}
-                                                            disabled={admin.utilization?.isAtCapacity}
+                                                            disabled={admin.clientsAssigned >= admin.maxClients}
                                                         >
-                                                            {admin.name} ({admin.utilization?.clientCount || 0}/{admin.utilization?.maxClients || 10})
+                                                            {admin.name} ({admin.clientsAssigned || 0}/{admin.maxClients || 10})
                                                         </SelectItem>
                                                     ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
+                                    {editingClient && (
+                                        <>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="pendingWork">Pending Work</Label>
+                                                <Input
+                                                    id="pendingWork"
+                                                    type="number"
+                                                    min="0"
+                                                    value={formData.pendingWork}
+                                                    onChange={(e) => setFormData({ ...formData, pendingWork: parseInt(e.target.value) || 0 })}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="completedWork">Completed Work</Label>
+                                                <Input
+                                                    id="completedWork"
+                                                    type="number"
+                                                    min="0"
+                                                    value={formData.completedWork}
+                                                    onChange={(e) => setFormData({ ...formData, completedWork: parseInt(e.target.value) || 0 })}
+                                                />
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                                 <div className="flex justify-end gap-2 mt-4">
                                     <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -288,7 +344,7 @@ export default function ClientListPage() {
                         </DialogContent>
                     </Dialog>
 
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={handleExport}>
                         <Download className="mr-2 h-4 w-4" /> Export
                     </Button>
                 </div>
@@ -347,13 +403,13 @@ export default function ClientListPage() {
                                 <Input
                                     placeholder="Search clients..."
                                     className="pl-8"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    value={localSearch}
+                                    onChange={(e) => setLocalSearch(e.target.value)}
                                 />
                             </div>
 
                             {/* Status Filter */}
-                            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <Select value={filters.status || "all"} onValueChange={handleStatusChange}>
                                 <SelectTrigger className="w-[130px]">
                                     <SelectValue placeholder="Status" />
                                 </SelectTrigger>
@@ -365,14 +421,14 @@ export default function ClientListPage() {
                             </Select>
 
                             {/* Admin Filter */}
-                            <Select value={adminFilter} onValueChange={setAdminFilter}>
+                            <Select value={filters.assignedAdmin || "all"} onValueChange={handleAdminChange}>
                                 <SelectTrigger className="w-[150px]">
                                     <SelectValue placeholder="Admin" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Admins</SelectItem>
                                     <SelectItem value="unassigned">Unassigned</SelectItem>
-                                    {admins.map((admin) => (
+                                    {admins.map((admin: any) => (
                                         <SelectItem key={admin.id} value={admin.id}>
                                             {admin.name}
                                         </SelectItem>
@@ -401,14 +457,14 @@ export default function ClientListPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredClients.length === 0 ? (
+                                {clients.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                                             No clients found
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    filteredClients.map((client) => {
+                                    clients.map((client) => {
                                         const assignedAdmin = client.assignedAdmin;
                                         return (
                                             <TableRow key={client._id}>
@@ -461,19 +517,19 @@ export default function ClientListPage() {
                                                         <SelectContent>
                                                             <SelectItem value="unassigned" className="text-red-500">
                                                                 Unassign
-                                                            </SelectItem>
-                                                            {admins
-                                                                .filter((a) => a.status === "ACTIVE")
-                                                                .map((admin) => (
+                                                            </SelectItem>                                                             {admins
+                                                                .filter((a: any) => a.status === "ACTIVE")
+                                                                .map((admin: any) => (
                                                                     <SelectItem
                                                                         key={admin.id}
                                                                         value={admin.id}
-                                                                        disabled={admin.utilization?.isAtCapacity}
+                                                                        disabled={admin.clientsAssigned >= admin.maxClients}
                                                                     >
-                                                                        {admin.name} ({admin.utilization?.clientCount || 0}/
-                                                                        {admin.utilization?.maxClients || 10})
+                                                                        {admin.name} ({admin.clientsAssigned || 0}/
+                                                                        {admin.maxClients || 10})
                                                                     </SelectItem>
                                                                 ))}
+
                                                         </SelectContent>
                                                     </Select>
                                                 </TableCell>
@@ -503,6 +559,33 @@ export default function ClientListPage() {
                                 )}
                             </TableBody>
                         </Table>
+                    )}
+
+                    {/* Pagination Controls */}
+                    {!loading && pagination.totalPages > 1 && (
+                        <div className="flex items-center justify-between px-2 py-4 border-t">
+                            <div className="text-sm text-slate-500">
+                                Showing page {pagination.page} of {pagination.totalPages} ({pagination.totalCount} total)
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage(Math.max(1, pagination.page - 1))}
+                                    disabled={pagination.page === 1}
+                                >
+                                    Previous
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage(Math.min(pagination.totalPages, pagination.page + 1))}
+                                    disabled={pagination.page === pagination.totalPages}
+                                >
+                                    Next
+                                </Button>
+                            </div>
+                        </div>
                     )}
                 </CardContent>
             </Card>

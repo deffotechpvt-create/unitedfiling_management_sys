@@ -3,13 +3,17 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
+import { isSuperAdmin, isAdmin } from "@/lib/roles";
 import { useClient } from "@/context/client-context";
 import { useCompany } from "@/context/company-context";
 import { useCompliance } from "@/context/compliance-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, FileText, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { useConsultation } from "@/context/consultation-context";
+import { useDocument } from "@/context/document-context";
+import { Button } from "@/components/ui/button";
+import { Users, FileText, CheckCircle, Clock, AlertCircle, MessageSquare, Download } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -21,11 +25,13 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 // Admin Dashboard Component - Shows THEIR assigned clients
-function AdminDashboard({ role, userId }: { role: string; userId: string }) {
-  const { clients, stats, loading, getAllClients } = useClient();
+function AdminDashboard({ role }: { role: string; }) {
+  const router = useRouter();
+  const { clients, stats, loading: clientsLoading } = useClient();
+  const { consultations, loading: consultLoading } = useConsultation();
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
-
-  // Load admin's clients is now handled reactively by ClientContext via selectedCompany
+  console.log("clients", clients);
+  const loading = clientsLoading || consultLoading;
 
   // Filter clients by status
   const filteredClients = clients.filter((client) => {
@@ -53,7 +59,7 @@ function AdminDashboard({ role, userId }: { role: string; userId: string }) {
     });
   };
 
-  if (loading && role === "ADMIN") {
+  if (loading && isAdmin(role)) {
     return (
       <div className="space-y-6 p-6">
         <Skeleton className="h-10 w-full" />
@@ -68,17 +74,16 @@ function AdminDashboard({ role, userId }: { role: string; userId: string }) {
     );
   }
 
-
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            {role === "ADMIN" ? "My Clients Dashboard" : "Dashboard"}
+            {isAdmin(role) ? "My Clients Dashboard" : "Dashboard"}
           </h1>
           <p className="text-slate-500 mt-1">
-            {role === "ADMIN"
+            {isAdmin(role)
               ? `Managing ${kpiStats.totalClients} client${kpiStats.totalClients !== 1 ? 's' : ''}`
               : "Your service overview"}
           </p>
@@ -121,22 +126,6 @@ function AdminDashboard({ role, userId }: { role: string; userId: string }) {
 
         <Card
           className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => setFilterStatus("PENDING")}
-        >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
-              <Clock className="h-4 w-4 text-orange-600" />
-              Pending Work
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{kpiStats.totalPendingWork}</div>
-            <p className="text-xs text-slate-500 mt-1">Tasks to complete</p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => setFilterStatus("COMPLETED")}
         >
           <CardHeader className="pb-2">
@@ -148,6 +137,22 @@ function AdminDashboard({ role, userId }: { role: string; userId: string }) {
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">{kpiStats.totalCompletedWork}</div>
             <p className="text-xs text-slate-500 mt-1">Tasks completed</p>
+          </CardContent>
+        </Card>
+
+        {/* Consultation Card for Admin */}
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push('/consult')}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-slate-500 flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-purple-600" />
+              Active Consultations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">
+              {consultations.filter(c => c.status !== 'COMPLETED').length}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Requiring attention</p>
           </CardContent>
         </Card>
       </div>
@@ -277,20 +282,20 @@ function AdminDashboard({ role, userId }: { role: string; userId: string }) {
 
 // User Dashboard Component - Shows THEIR companies and compliance stats
 function UserDashboard() {
-  const { companies, loading: companiesLoading } = useCompany();
-  const { stats: complianceStats, loading: statsLoading, fetchStats } = useCompliance();
+  const router = useRouter();
+  const { companies, loading: companiesLoading, selectedCompany } = useCompany();
+  const { stats: complianceStats, loading: statsLoading, refreshAll } = useCompliance();
+  const { consultations, loading: consultLoading } = useConsultation();
+  const { documents, loading: docsLoading } = useDocument();
 
-  // fetchStats is now handled reactively by ComplianceContext via selectedCompany
+  console.log("selectedCompany", companies);
+  const loading = companiesLoading || statsLoading || consultLoading || docsLoading;
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const loading = companiesLoading || statsLoading;
+  useEffect(() => {
+    if (selectedCompany?._id) {
+      refreshAll(selectedCompany._id);
+    }
+  }, [selectedCompany?._id, refreshAll]);
 
   if (loading) {
     return (
@@ -392,7 +397,7 @@ function UserDashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Company Name</TableHead>
-                  <TableHead>Registration Number</TableHead>
+                  <TableHead>Phone Number</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Members</TableHead>
@@ -403,7 +408,7 @@ function UserDashboard() {
                 {companies.map((company) => (
                   <TableRow key={company._id} className="hover:bg-slate-50">
                     <TableCell className="font-medium">{company.name}</TableCell>
-                    <TableCell>{company.registrationNumber}</TableCell>
+                    <TableCell>{company.phone}</TableCell>
                     <TableCell>
                       <Badge variant={company.status === "ACTIVE" ? "default" : "secondary"}>
                         {company.status}
@@ -411,14 +416,14 @@ function UserDashboard() {
                     </TableCell>
                     <TableCell>
                       <div className="text-xs text-slate-500">
-                        {company.address?.city}, {company.address?.state}
+                        {company.fullAddress}
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{company.memberCount} Members</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <button className="text-sm text-blue-600 hover:underline">View Details</button>
+                      <button onClick={() => router.push('/companies')} className="text-sm text-blue-600 hover:underline">View Details</button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -427,6 +432,75 @@ function UserDashboard() {
           )}
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Consultations */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-purple-600" />
+              Recent Consultations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {consultations.length === 0 ? (
+              <div className="text-center py-6 text-slate-500 text-sm">
+                No recent consultations.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {consultations.slice(0, 3).map((consult) => (
+                  <div key={consult._id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{consult.type === 'CA' ? 'Chartered Accountant' : 'Legal Consultant'}</p>
+                      <p className="text-xs text-slate-500">Ticket #{consult.ticketNumber}</p>
+                    </div>
+                    <Badge variant={consult.status === 'COMPLETED' ? 'default' : 'secondary'}>
+                      {consult.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Documents */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-600" />
+              Recent Documents
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {documents.length === 0 ? (
+              <div className="text-center py-6 text-slate-500 text-sm">
+                No recent documents.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {documents.slice(0, 3).map((doc) => (
+                  <div key={doc._id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-4 w-4 text-slate-400" />
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900 truncate max-w-[150px]">{doc.name}</p>
+                        <p className="text-xs text-slate-500">{new Date(doc.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm" asChild>
+                      <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                        <Download className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -440,7 +514,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!loading && isAuthenticated && user) {
       // Redirect SUPER_ADMIN to their dashboard
-      if (user.role === "SUPER_ADMIN") {
+      if (isSuperAdmin(user.role)) {
         router.push("/super-admin");
       }
     }
@@ -461,13 +535,13 @@ export default function DashboardPage() {
   }
 
   // SUPER_ADMIN redirects to /super-admin (handled in useEffect)
-  if (user.role === "SUPER_ADMIN") {
+  if (isSuperAdmin(user.role)) {
     return null; // Will redirect
   }
 
   // ADMIN see their dashboard
-  if (user.role === "ADMIN") {
-    return <AdminDashboard role={user.role} userId={user.id || user.id} />;
+  if (isAdmin(user.role)) {
+    return <AdminDashboard role={user.role} userId={user._id} />;
   }
 
   // USER (Client) sees UserDashboard

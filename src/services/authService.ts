@@ -33,12 +33,21 @@ export const authService = {
     return data;
   },
 
-  // Change password
-  async changePassword(currentPassword: string, newPassword: string): Promise<AuthResponse> {
-    const { data } = await api.put('/auth/change-password', {
-      currentPassword,
-      newPassword,
-    });
+  // Forgot Password
+  async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
+    const { data } = await api.post('/auth/forgot-password', { email });
+    return data;
+  },
+
+  // Reset Password
+  async resetPassword(token: string, password: string): Promise<{ success: boolean; message: string }> {
+    const { data } = await api.post(`/auth/reset-password/${token}`, { password });
+    return data;
+  },
+
+  // Update onboarding task
+  async updateOnboardingTask(task: string, completed: boolean = true): Promise<{ success: boolean; onboardingTasks: any }> {
+    const { data } = await api.patch(`/auth/onboarding/${task}`, { completed });
     return data;
   },
 };

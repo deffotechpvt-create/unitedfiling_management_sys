@@ -31,18 +31,6 @@ exports.getServerStats = asyncHandler(async (req, res) => {
  * @access  Private (SUPER_ADMIN only)
  */
 exports.getAllUsers = asyncHandler(async (req, res) => {
-  // const { role, status } = req.query;
-
-  // const filter = {};
-
-  // // Security Enforcement: ADMIN can only see USER role accounts
-  // if (req.user.role === constants.ROLES.ADMIN) {
-  //   filter.role = constants.ROLES.USER;
-  // } else if (role) {
-  //   filter.role = role;
-  // }
-
-  // if (status) filter.status = status;
 
   const users = await User.find({ role: constants.ROLES.USER })
     .select('name email status createdAt')
@@ -59,6 +47,23 @@ exports.getAllUsers = asyncHandler(async (req, res) => {
       users: sanitizedUsers,
       count: users.length,
       message: 'Users retrieved successfully'
+    })
+  );
+});
+
+/**
+ * @desc    Get admins for compliance assignment (minimal list)
+ * @route   GET /api/users/admins/for-assignment
+ * @access  Private (SUPER_ADMIN, ADMIN)
+ */
+exports.getAdminsForAssignment = asyncHandler(async (req, res) => {
+  const admins = await User.find({ role: constants.ROLES.ADMIN })
+    .select('name email')
+    .sort({ name: 1 });
+  res.status(200).json(
+    new ApiResponse(200, {
+      admins: admins.map(a => ({ _id: a._id, id: a._id, name: a.name, email: a.email })),
+      message: 'Admins retrieved for assignment'
     })
   );
 });

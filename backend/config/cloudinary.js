@@ -1,23 +1,10 @@
-// const { S3Client } = require('@aws-sdk/client-s3');
+const cloudinary = require('cloudinary').v2;
 
-// Cloudflare R2 is S3-compatible
-// COMMENTED OUT - Will be implemented in Phase 4
-/*
-const r2Client = new S3Client({
-  region: 'auto', // R2 uses 'auto' region
-  endpoint: process.env.R2_ENDPOINT,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-  },
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true,
 });
 
-console.log('☁️  Cloudflare R2 client initialized');
-
-module.exports = r2Client;
-*/
-
-// Temporary placeholder for Phase 4
-module.exports = null;
-
-console.log('⚠️  Cloudflare R2 disabled - Will be configured in Phase 4');
+module.exports = cloudinary;

@@ -23,6 +23,8 @@ import {
     UserMinus,
     RefreshCw,
 } from "lucide-react";
+import { RoleGuard } from "@/components/layout/RoleGuard";
+import { ROLES } from "@/lib/roles";
 
 export function ManageUsersTab() {
     const {
@@ -182,38 +184,40 @@ export function ManageUsersTab() {
                                             })}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex items-center justify-end gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={`h-9 px-3 font-semibold text-xs rounded-lg transition-all ${user.status === "ACTIVE"
-                                                        ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                        : "text-green-600 hover:text-green-700 hover:bg-green-50"
-                                                        }`}
-                                                    onClick={() =>
-                                                        handleToggleStatus(user._id)
-                                                    }
-                                                >
-                                                    {user.status === "ACTIVE" ? (
-                                                        <>
-                                                            <UserMinus className="mr-1.5 h-3.5 w-3.5" /> Revoke Access
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <UserCheck className="mr-1.5 h-3.5 w-3.5" /> Grant Access
-                                                        </>
-                                                    )}
-                                                </Button>
+                                            <RoleGuard allowedRoles={[ROLES.SUPER_ADMIN]}>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className={`h-9 px-3 font-semibold text-xs rounded-lg transition-all ${user.status === "ACTIVE"
+                                                            ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                            : "text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                            }`}
+                                                        onClick={() =>
+                                                            handleToggleStatus(user._id)
+                                                        }
+                                                    >
+                                                        {user.status === "ACTIVE" ? (
+                                                            <>
+                                                                <UserMinus className="mr-1.5 h-3.5 w-3.5" /> Revoke Access
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <UserCheck className="mr-1.5 h-3.5 w-3.5" /> Grant Access
+                                                            </>
+                                                        )}
+                                                    </Button>
 
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-9 w-9 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                                    onClick={() => handleDelete(user._id, user.name)}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-9 w-9 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                        onClick={() => handleDelete(user._id, user.name)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </RoleGuard>
                                         </TableCell>
                                     </TableRow>
                                 ))

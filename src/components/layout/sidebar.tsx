@@ -3,14 +3,14 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, FileText, ShoppingBag, ShieldCheck, Settings, Menu, LogOut, Calendar, Users, Circle, HelpCircle, Building2 } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { LayoutDashboard, FileText, ShoppingBag, ShieldCheck, Menu, LogOut, Calendar, Users, HelpCircle, Building2 } from "lucide-react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/context/auth-context"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { useState, useRef, useEffect } from "react"
 import { GetStartedGuide } from "@/components/layout/get-started-guide"
-
+import { ROLES } from "@/lib/roles"
 
 
 export function Sidebar() {
@@ -19,10 +19,6 @@ export function Sidebar() {
     const [open, setOpen] = useState(false)
     const [showGetStarted, setShowGetStarted] = useState(false)
     const getStartedRef = useRef<HTMLDivElement>(null)
-
-    // Don't render sidebar on login page
-    if (pathname === "/login") return null
-    if (pathname === "/onboarding") return null
 
     // Click outside to close get started
     useEffect(() => {
@@ -37,42 +33,44 @@ export function Sidebar() {
         }
     }, [getStartedRef])
 
+    // Don't render sidebar on login page or onboarding page
+    if (pathname === "/login" || pathname === "/onboarding") return null
+
     // Navigation Items based on Role
     const getNavigation = () => {
         if (!user) return []
 
         switch (user.role) {
-            case "SUPER_ADMIN":
+            case ROLES.SUPER_ADMIN:
                 return [
                     { name: "Global Dashboard", href: "/", icon: LayoutDashboard },
                     { name: "Client List", href: "/super-admin/clients", icon: Building2 },
                     { name: "Admin & User Management", href: "/super-admin/admins", icon: Users },
+                    { name: "Compliance Templates", href: "/templates", icon: ShieldCheck },
                     { name: "Documents", href: "/documents", icon: FileText },
+                    { name: "Consultations", href: "/consult", icon: HelpCircle },
                     { name: "Reports", href: "/reports", icon: FileText },
-                    // { name: "Audit Logs", href: "/audit", icon: FileText },
                 ]
-            case "ADMIN":
+            case ROLES.ADMIN:
                 return [
                     { name: "Dashboard", href: "/", icon: LayoutDashboard },
                     { name: "Manage Clients", href: "/admin/clients", icon: Users },
                     { name: "Manage Companies", href: "/admin/companies", icon: Building2 },
-                    { name: "Tasks", href: "/compliances", icon: ShieldCheck }, // Reusing compliances for tasks
+                    { name: "Tasks", href: "/compliances", icon: ShieldCheck },
+                    { name: "Consultations", href: "/consult", icon: HelpCircle },
                     { name: "Calendar", href: "/calendar", icon: Calendar },
                     { name: "Documents", href: "/documents", icon: FileText },
-                    { name: "Reports", href: "/reports", icon: FileText },
                 ]
-            case "USER":
+            case ROLES.USER:
             default:
                 return [
-                    // { name: "Home", href: "/", icon: LayoutDashboard }, // User Dashboard removed
+                    { name: "Dashboard", href: "/", icon: LayoutDashboard },
                     { name: "Compliances", href: "/compliances", icon: ShieldCheck },
-                    { name: "Billing", href: "/billing", icon: ShoppingBag, badge: "COMING SOON" },
-                    { name: "Service Hub", href: "/services", icon: ShoppingBag, star: true },
-                    { name: "Calendar", href: "/calendar", icon: Calendar },
+                    { name: "Companies", href: "/companies", icon: Building2 },
                     { name: "Documents", href: "/documents", icon: FileText },
-                    { name: "Reports", href: "/reports", icon: FileText },
                     { name: "Consult", href: "/consult", icon: Users },
-                    { name: "Users & Roles", href: "/users", icon: Users },
+                    { name: "Calendar", href: "/calendar", icon: Calendar },
+                    { name: "Service Hub", href: "/services", icon: ShoppingBag, star: true },
                 ]
         }
     }
@@ -134,20 +132,63 @@ export function Sidebar() {
                 <div className="relative">
                     {showGetStarted && <GetStartedGuide />}
 
-                    <button
-                        onClick={() => setShowGetStarted(!showGetStarted)}
-                        className="w-full flex items-center justify-between bg-slate-800/50 hover:bg-slate-800 p-3 rounded-lg border border-slate-700 transition-all mb-2 group"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="relative h-5 w-5 flex items-center justify-center">
-                                <div className="absolute inset-0 border-2 border-slate-500 rounded-full border-t-green-500 -rotate-45" />
+                    {user?.role === ROLES.USER && (
+                        <button
+                            onClick={() => setShowGetStarted(!showGetStarted)}
+                            className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 p-3 rounded-xl border border-white/10 transition-all mb-2 group relative overflow-hidden"
+                        >
+                            <div className="flex items-center gap-3 relative z-10">
+                                <div className="relative h-6 w-6 flex items-center justify-center">
+                                    {/* Progress Circle Background */}
+                                    <svg className="h-6 w-6 transform -rotate-90">
+                                        <circle
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            fill="transparent"
+                                            className="text-slate-700"
+                                        />
+                                        {/* Progress Path */}
+                                        <circle
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            fill="transparent"
+                                            strokeDasharray={2 * Math.PI * 10}
+                                            strokeDashoffset={2 * Math.PI * 10 * (1 - (Object.values(user?.onboardingTasks || {}).filter(Boolean).length / 3))}
+                                            strokeLinecap="round"
+                                            className="text-green-500 transition-all duration-700 ease-in-out"
+                                        />
+                                    </svg>
+                                    {/* Checkmark if all completed */}
+                                    {Object.values(user?.onboardingTasks || {}).filter(Boolean).length === 3 && (
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="h-1.5 w-1.5 bg-green-500 rounded-full animate-pulse" />
+                                        </div>
+                                    )}
+                                </div>
+                                <span className="text-sm font-semibold tracking-wide text-white/90">Get Started</span>
                             </div>
-                            <span className="text-sm font-medium">Get Started</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-400">
-                            1/4 <span className="text-[10px]">&gt;</span>
-                        </div>
-                    </button>
+                            <div className="flex items-center gap-2 relative z-10">
+                                <span className="text-xs font-bold text-slate-400">
+                                    {Object.values(user?.onboardingTasks || {}).filter(Boolean).length}/3
+                                </span>
+                                <div className={cn(
+                                    "transition-transform duration-300",
+                                    showGetStarted ? "rotate-180" : ""
+                                )}>
+                                    <span className="text-[10px] text-slate-500 font-bold">&gt;</span>
+                                </div>
+                            </div>
+
+                            {/* subtle glassmorphism overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                        </button>
+                    )}
 
                     {/* Logout Button for visual completeness in this area or keep in user menu */}
                     <div className="mt-2 pt-2 border-t border-slate-800 flex items-center px-2 py-2">

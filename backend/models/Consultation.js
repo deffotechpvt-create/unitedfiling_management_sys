@@ -25,7 +25,8 @@ const ConsultationSchema = new mongoose.Schema({
     // Operational Details
     ticketNumber: {
         type: String,
-        required: true,
+        default: () => generateTicketNumber(),
+        unique: true
     },
     status: {
         type: String,
@@ -33,7 +34,7 @@ const ConsultationSchema = new mongoose.Schema({
             values: Object.values(constants.CONSULTATION_STATUS),
             message: '{VALUE} is not a valid status',
         },
-        default: constants.CONSULTATION_STATUS.PAYMENT_PENDING,
+        default: constants.CONSULTATION_STATUS.PENDING,
     },
 
     // Scheduling
@@ -70,6 +71,20 @@ const ConsultationSchema = new mongoose.Schema({
         },
     }],
 
+    // Payment Details
+    payment: {
+        orderId: { type: String },
+        paymentId: { type: String },
+        amount: { type: Number, default: 1000 },
+        currency: { type: String, default: 'INR' },
+        status: {
+            type: String,
+            enum: ['PENDING', 'PAID', 'FAILED', 'REFUNDED'],
+            default: 'PENDING'
+        },
+        paidAt: { type: Date }
+    },
+
     // Additional Information
     notes: {
         type: String,
@@ -90,16 +105,6 @@ ConsultationSchema.index({ 'scheduledSlot.date': 1 });
 ConsultationSchema.index({ user: 1, status: 1 });
 
 // 3. Pre/Post Hooks
-
-/**
- * Pre-save: Generate ticket number if not exists
- */
-ConsultationSchema.pre('save', function (next) {
-    if (!this.ticketNumber) {
-        this.ticketNumber = generateTicketNumber();
-    }
-    next();
-});
 
 /**
  * Pre-save: Set client from user
@@ -130,7 +135,7 @@ ConsultationSchema.methods.addMessage = async function (sender, content) {
  */
 ConsultationSchema.methods.schedule = async function (date, time) {
     this.scheduledSlot = { date, time };
-    this.status = constants.CONSULTATION_STATUS.SCHEDULED;
+    this.status = constants.CONSULTATION_STATUS.CONFIRMED;
     return this.save();
 };
 
@@ -150,13 +155,6 @@ ConsultationSchema.methods.markCompleted = async function () {
     return this.save();
 };
 
-/**
- * Verify OTP and update status
- */
-ConsultationSchema.methods.verifyAndSchedule = async function () {
-    this.status = constants.CONSULTATION_STATUS.SCHEDULED;
-    return this.save();
-};
 
 /**
  * Add note
@@ -200,7 +198,7 @@ ConsultationSchema.statics.findByStatus = function (status) {
  * Find pending consultations
  */
 ConsultationSchema.statics.findPending = function () {
-    return this.find({ status: constants.CONSULTATION_STATUS.PAYMENT_PENDING })
+    return this.find({ status: constants.CONSULTATION_STATUS.PENDING })
         .populate('user', 'name email')
         .sort({ createdAt: -1 });
 };
@@ -211,7 +209,7 @@ ConsultationSchema.statics.findPending = function () {
 ConsultationSchema.statics.findUnassigned = function () {
     return this.find({
         assignedExpert: null,
-        status: { $ne: constants.CONSULTATION_STATUS.PAYMENT_PENDING },
+        status: { $ne: constants.CONSULTATION_STATUS.PENDING },
     })
         .populate('user', 'name email')
         .sort({ createdAt: -1 });
@@ -223,10 +221,10 @@ ConsultationSchema.statics.findUnassigned = function () {
 ConsultationSchema.statics.getStats = async function () {
     const total = await this.countDocuments();
     const pending = await this.countDocuments({
-        status: constants.CONSULTATION_STATUS.PAYMENT_PENDING,
+        status: constants.CONSULTATION_STATUS.PENDING,
     });
     const scheduled = await this.countDocuments({
-        status: constants.CONSULTATION_STATUS.SCHEDULED,
+        status: constants.CONSULTATION_STATUS.CONFIRMED,
     });
     const completed = await this.countDocuments({
         status: constants.CONSULTATION_STATUS.COMPLETED,

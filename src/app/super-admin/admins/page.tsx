@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-import { useAuth } from "@/context/auth-context";
 import { useSuperAdmin } from "@/context/super-admin-context";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,6 +10,8 @@ import { ShieldAlert, UserCheck, UserMinus, Loader2, AlertCircle, RefreshCw, Tra
 import { CreateAdminDialog } from "@/components/super-admin/CreateAdminDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ManageUsersTab } from "@/components/super-admin/ManageUsersTab";
+import { RoleGuard } from "@/components/layout/RoleGuard";
+import { ROLES } from "@/lib/roles";
 
 export default function AdminManagementPage() {
     const { admins, loading, error, updateAdminStatus, refreshAdmins, deleteAdmin } = useSuperAdmin();
@@ -51,11 +51,13 @@ export default function AdminManagementPage() {
                     <p className="text-slate-500">Manage admin access and view their current load.</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={refreshAdmins} disabled={loading}>
+                    <Button variant="outline" size="sm" onClick={() => refreshAdmins()} disabled={loading}>
                         <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                         Refresh
                     </Button>
-                    <CreateAdminDialog />
+                    <RoleGuard allowedRoles={[ROLES.SUPER_ADMIN]}>
+                        <CreateAdminDialog />
+                    </RoleGuard>
                 </div>
             </div>
 
@@ -141,35 +143,37 @@ export default function AdminManagementPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className={
-                                                            admin.status === "ACTIVE"
-                                                                ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                                : "text-green-600 hover:text-green-700 hover:bg-green-50"
-                                                        }
-                                                        onClick={() => handleToggleStatus(admin.id)}
-                                                    >
-                                                        {admin.status === "ACTIVE" ? (
-                                                            <>
-                                                                <UserMinus className="mr-2 h-4 w-4" /> Revoke Access
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <UserCheck className="mr-2 h-4 w-4" /> Grant Access
-                                                            </>
-                                                        )}
-                                                    </Button>
+                                                    <RoleGuard allowedRoles={[ROLES.SUPER_ADMIN]}>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className={
+                                                                admin.status === "ACTIVE"
+                                                                    ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                    : "text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                            }
+                                                            onClick={() => handleToggleStatus(admin.id)}
+                                                        >
+                                                            {admin.status === "ACTIVE" ? (
+                                                                <>
+                                                                    <UserMinus className="mr-2 h-4 w-4" /> Revoke Access
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <UserCheck className="mr-2 h-4 w-4" /> Grant Access
+                                                                </>
+                                                            )}
+                                                        </Button>
 
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-2"
-                                                        onClick={() => handleDeleteAdmin(admin.id, admin.name)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-2"
+                                                            onClick={() => handleDeleteAdmin(admin.id, admin.name)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </RoleGuard>
                                                 </TableCell>
                                             </TableRow>
                                         ))}

@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Bell, CheckCircle2, FileText, Receipt } from "lucide-react"
+import { Bell, CheckCircle2,Receipt } from "lucide-react"
 
 export default function BillingPage() {
     return (

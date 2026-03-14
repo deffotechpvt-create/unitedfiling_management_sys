@@ -1,11 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { userService } from "@/services/userService";
 import { clientService } from "@/services/clientService";
 import { useAuth } from "./auth-context";
 import { useCompany } from "./company-context";
 import { toast } from "sonner";
+import { isSuperAdmin } from "@/lib/roles";
 
 // Types
 export interface Admin {
@@ -46,9 +47,9 @@ interface SuperAdminContextType {
     allUsers: any[];
     loading: boolean;
     error: string | null;
-    refreshAdmins: () => Promise<void>;
-    refreshClients: () => Promise<void>;
-    refreshAllUsers: () => Promise<void>;
+    refreshAdmins: (force?: boolean) => Promise<void>;
+    refreshClients: (force?: boolean) => Promise<void>;
+    refreshAllUsers: (force?: boolean) => Promise<void>;
     updateAdminStatus: (adminId: string) => Promise<void>;
     updateUserStatus: (userId: string) => Promise<void>;
     deleteUser: (userId: string) => Promise<void>;
@@ -67,9 +68,13 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
     const [admins, setAdmins] = useState<Admin[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [serverStats, setServerStats] = useState<ServerStats | null>(null);
+
+    const lastFetchTime = useRef<{ admins: number, clients: number, users: number }>({ admins: 0, clients: 0, users: 0 });
+    const isFetching = useRef<{ admins: boolean, clients: boolean, users: boolean }>({ admins: false, clients: false, users: false });
+    const CACHE_DURATION = 60000; // 1 minute
 
     const fetchServerStats = async () => {
         try {
@@ -79,8 +84,9 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
             console.error('Failed to fetch server stats', error);
         }
     };
+
     useEffect(() => {
-        if (!user || user.role !== "SUPER_ADMIN") {
+        if (!user || !isSuperAdmin(user.role)) {
             setServerStats(null);
             return;
         }
@@ -94,7 +100,15 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
 
 
     // Fetch admins from API
-    const refreshAdmins = async () => {
+    const refreshAdmins = async (force: boolean = false) => {
+        const now = Date.now();
+        if (!force && now - lastFetchTime.current.admins < CACHE_DURATION && admins.length > 0) {
+            return;
+        }
+
+        if (isFetching.current.admins) return;
+        isFetching.current.admins = true;
+
         try {
             setLoading(true);
             setError(null);
@@ -105,7 +119,7 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
                 name: admin.name,
                 email: admin.email,
                 phone: admin.phone,
-                status: admin.status,
+                status: admin.status as any,
                 clientsAssigned: admin.utilization.clientCount,
                 maxClients: admin.utilization.maxClients,
                 utilizationPercentage: Math.round(
@@ -114,25 +128,35 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
             }));
 
             setAdmins(transformedAdmins);
+            lastFetchTime.current.admins = Date.now();
         } catch (err: any) {
             console.error("Error fetching admins:", err);
             setError(err.response?.data?.message || "Failed to fetch admins");
         } finally {
             setLoading(false);
+            isFetching.current.admins = false;
         }
     };
 
     // Fetch clients from API
-    const refreshClients = async (companyId?: string) => {
+    const refreshClients = async (force: boolean = false) => {
+        const now = Date.now();
+        if (!force && now - lastFetchTime.current.clients < CACHE_DURATION && clients.length > 0) {
+            return;
+        }
+
+        if (isFetching.current.clients) return;
+        isFetching.current.clients = true;
+
         try {
             setLoading(true);
-            const response = await clientService.getAllClients({ company: companyId });
+            const response = await clientService.getAllClients({ company: selectedCompany?._id });
 
             const transformedClients: Client[] = response.clients.map((client) => ({
                 id: client._id,
                 name: client.name,
                 companyName: client.companyName,
-                status: client.status,
+                status: client.status as any,
                 assignedAdminId: client.assignedAdmin?._id || null,
                 pendingWork: client.pendingWork || 0,
                 completedWork: client.completedWork || 0,
@@ -146,36 +170,55 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
             }));
 
             setClients(transformedClients);
+            lastFetchTime.current.clients = Date.now();
         } catch (err: any) {
             console.error("Error fetching clients:", err);
             setError(err.response?.data?.message || "Failed to fetch clients");
         } finally {
             setLoading(false);
+            isFetching.current.clients = false;
         }
     };
 
     // Fetch all users for management
-    const refreshAllUsers = async () => {
+    const refreshAllUsers = async (force: boolean = false) => {
+        const now = Date.now();
+        if (!force && now - lastFetchTime.current.users < CACHE_DURATION && allUsers.length > 0) {
+            return;
+        }
+
+        if (isFetching.current.users) return;
+        isFetching.current.users = true;
+
         try {
             setLoading(true);
             const response = await userService.getAllUsers();
             setAllUsers(response.users);
+            lastFetchTime.current.users = Date.now();
         } catch (err: any) {
             console.error("Error fetching users:", err);
             setError(err.response?.data?.message || "Failed to fetch users");
         } finally {
             setLoading(false);
+            isFetching.current.users = false;
         }
+    };
+
+    const refreshAll = async (force: boolean = false) => {
+        if (!isSuperAdmin(user?.role)) return;
+        await Promise.all([
+            refreshAdmins(force),
+            refreshClients(force),
+            refreshAllUsers(force)
+        ]);
     };
 
     // Load initial global data on mount (only for SUPER_ADMIN)
     useEffect(() => {
-        if (user?.role === "SUPER_ADMIN") {
-            refreshAdmins();
-            refreshClients();
-            refreshAllUsers();
+        if (isSuperAdmin(user?.role)) {
+            refreshAll(false);
         }
-    }, [user]);
+    }, [user?._id, user?.role, selectedCompany?._id]);
 
     // ✅ OPTIMISTIC: Update admin status
     const updateAdminStatus = async (adminId: string) => {

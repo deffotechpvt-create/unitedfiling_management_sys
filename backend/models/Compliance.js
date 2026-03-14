@@ -25,6 +25,10 @@ const ComplianceSchema = new mongoose.Schema({
         required: [true, 'Service type is required'],
         trim: true,
     },
+    category: {
+        type: String,
+        trim: true,
+    },
     expertName: {
         type: String,
         trim: true,
@@ -44,6 +48,10 @@ const ComplianceSchema = new mongoose.Schema({
             message: '{VALUE} is not a valid department',
         },
         default: constants.DEPARTMENTS.OTHER,
+    },
+    isMandatory: {
+        type: Boolean,
+        default: false,
     },
 
     // Progress Tracking

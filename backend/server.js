@@ -15,11 +15,10 @@ const server = app.listen(PORT, () => {
   console.log(`🌐 API Base URL: http://localhost:${PORT}/api`);
   console.log('='.repeat(50));
   console.log('');
-  console.log('📋 Phase 1: Authentication Module');
-  console.log('✅ Models: User, Client');
-  console.log('✅ Routes: /api/auth/*');
-  console.log('⚠️  Cloudflare R2: Disabled (Phase 4)');
-  console.log('⚠️  Brevo Email: ' + (process.env.BREVO_API_KEY ? 'Configured' : 'Disabled (Optional)'));
+  console.log('📋 Phase 3: Advanced Features');
+  console.log('✅ Models: User, Client, Company, Compliance, Consultation, Document');
+  console.log('✅ Storage: Cloudinary Integrated');
+  console.log('✅ Email: ' + (process.env.BREVO_API_KEY ? 'Configured (Brevo)' : 'Disabled (Optional)'));
   console.log('');
   console.log('='.repeat(50));
 });

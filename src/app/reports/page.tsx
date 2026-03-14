@@ -1,42 +1,23 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { FileText, Download, ChevronLeft, Gift, Loader2 } from "lucide-react"
-import { reportService, ReportStats, HighRiskCompliance } from "@/services/reportService"
-import { toast } from "sonner"
-import { useCompany } from "@/context/company-context"
+import { useReport } from "@/context/report-context"
 
 type ViewState = 'DASHBOARD' | 'HIGH_RISK'
 
 export default function ReportsPage() {
     const [view, setView] = useState<ViewState>('DASHBOARD')
-    const [stats, setStats] = useState<ReportStats | null>(null)
-    const [highRiskItems, setHighRiskItems] = useState<HighRiskCompliance[]>([])
-    const [loading, setLoading] = useState(true)
-    const { selectedCompany } = useCompany()
+    const { 
+        stats, 
+        highRiskCompliances: highRiskItems, 
+        loading, 
+    } = useReport();
 
-    const fetchData = useCallback(async () => {
-        try {
-            setLoading(true)
-            const [statsRes, highRiskRes] = await Promise.all([
-                reportService.getOverview(selectedCompany?._id),
-                reportService.getHighRiskCompliances(selectedCompany?._id)
-            ])
-            setStats(statsRes.stats)
-            setHighRiskItems(highRiskRes.compliances)
-        } catch (error: any) {
-            console.error("Error fetching reports:", error)
-            toast.error(error.response?.data?.message || "Failed to load report data")
-        } finally {
-            setLoading(false)
-        }
-    }, [selectedCompany?._id])
-
-    useEffect(() => {
-        fetchData()
-    }, [fetchData])
+    // Caching/Refetching is handled by the context provider's useEffect
+    // but we might want to manually refresh if company changes (context does this too)
 
     if (loading && !stats) {
         return (

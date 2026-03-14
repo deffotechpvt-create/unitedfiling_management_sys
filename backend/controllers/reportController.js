@@ -60,10 +60,12 @@ const getReportOverview = asyncHandler(async (req, res) => {
 
     res.status(200).json(
         new ApiResponse(200, {
-            byRisk: riskStats,
-            byStage: stageStats,
-            byOrganization: orgStats,
-            byDepartment: deptStats,
+            stats: {
+                byRisk: riskStats,
+                byStage: stageStats,
+                byOrganization: orgStats,
+                byDepartment: deptStats,
+            },
             message: 'Report overview retrieved successfully'
         })
     );

@@ -10,6 +10,8 @@ const companyRoutes = require('./companyRoutes');
 const complianceRoutes = require('./complianceRoutes');
 const serviceRoutes = require('./serviceRoutes');
 const reportRoutes = require('./reportRoutes');
+const consultationRoutes = require('./consultationRoutes');
+const documentRoutes = require('./documentRoutes');
 
 // Register route
 
@@ -21,6 +23,8 @@ router.use('/companies', companyRoutes);
 router.use('/compliances', complianceRoutes);
 router.use('/services', serviceRoutes);
 router.use('/reports', reportRoutes);
+router.use('/consultations', consultationRoutes);
+router.use('/documents', documentRoutes);
 
 // Health check for API
 router.get('/health', (req, res) => {

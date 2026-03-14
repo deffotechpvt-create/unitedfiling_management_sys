@@ -17,8 +17,8 @@
   "author": "Sachin tiwari",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.490.0",
     "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.9.0",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -32,6 +32,7 @@
     "mongoose": "^8.0.3",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
+    "razorpay": "^2.9.6",
     "sib-api-v3-sdk": "^8.5.0",
     "winston": "^3.11.0"
   },

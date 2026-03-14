@@ -10,6 +10,9 @@ import { SuperAdminProvider } from "@/context/super-admin-context"
 import { ClientProvider } from "@/context/client-context"
 import { ComplianceProvider } from "@/context/compliance-context"
 import { ServiceProvider } from "@/context/service-context"
+import { ConsultationProvider } from "@/context/consultation-context"
+import { DocumentProvider } from "@/context/document-context"
+import { ReportProvider } from "@/context/report-context"
 
 const queryClient = new QueryClient()
 
@@ -22,8 +25,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
                         <ClientProvider>
                             <ComplianceProvider>
                                 <ServiceProvider>
-                                    {children}
-                                    <Toaster />
+                                    <ConsultationProvider>
+                                        <DocumentProvider>
+                                            <ReportProvider>
+                                                {children}
+                                                <Toaster />
+                                            </ReportProvider>
+                                        </DocumentProvider>
+                                    </ConsultationProvider>
                                 </ServiceProvider>
                             </ComplianceProvider>
                         </ClientProvider>

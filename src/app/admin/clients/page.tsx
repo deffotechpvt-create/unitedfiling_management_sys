@@ -24,7 +24,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Users, Search, Download, Plus, Pencil, PlusCircle } from "lucide-react";
+import { Users, Search, Download, Plus, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
     Select,
@@ -36,6 +36,8 @@ import {
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { canManageClients } from "@/lib/roles";
+import { downloadCSV } from "@/lib/export";
 
 export default function AdminClientListPage() {
     const { user } = useAuth();
@@ -44,10 +46,11 @@ export default function AdminClientListPage() {
         stats,
         loading,
         filters,
+        pagination,
+        setPage,
         setFilters,
         createClient,
         updateClient,
-        refreshClients,
     } = useClient();
     const { selectedCompany } = useCompany();
     const router = useRouter();
@@ -62,8 +65,7 @@ export default function AdminClientListPage() {
         }
     }, [selectedCompany?._id]);
 
-    const [searchQuery, setSearchQuery] = useState("");
-    const [statusFilter, setStatusFilter] = useState<string>("all");
+    const [localSearch, setLocalSearch] = useState(filters.search || "");
 
     // Dialog State
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -74,26 +76,36 @@ export default function AdminClientListPage() {
         email: "",
         phone: "",
         status: "ACTIVE",
+        pendingWork: 0,
+        completedWork: 0,
     });
 
     // Enforce role check (though middleware should handle this)
     useEffect(() => {
-        if (user && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+        if (user && !canManageClients(user.role)) {
             router.push("/");
         }
     }, [user, router]);
 
-    // Apply local filters (assignedAdmin is handled by backend for ADMIN role)
-    const filteredClients = clients.filter((client: any) => {
-        const matchesSearch =
-            client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            client.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            client.email?.toLowerCase().includes(searchQuery.toLowerCase());
+    // Handle search Input debounce
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (localSearch !== filters.search) {
+                setFilters(prev => ({ ...prev, search: localSearch }));
+            }
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [localSearch]);
 
-        const matchesStatus = statusFilter === "all" || client.status === statusFilter;
-
-        return matchesSearch && matchesStatus;
-    });
+    const handleStatusChange = (val: string) => {
+        setFilters(prev => {
+            if (val === "all") {
+                const { status, ...rest } = prev;
+                return rest;
+            }
+            return { ...prev, status: val as 'ACTIVE' | 'INACTIVE' };
+        });
+    };
 
     const handleOpenAdd = () => {
         setEditingClient(null);
@@ -103,6 +115,8 @@ export default function AdminClientListPage() {
             email: "",
             phone: "",
             status: "ACTIVE",
+            pendingWork: 0,
+            completedWork: 0,
         });
         setIsDialogOpen(true);
     };
@@ -115,6 +129,8 @@ export default function AdminClientListPage() {
             email: client.email || "",
             phone: client.phone || "",
             status: client.status || "ACTIVE",
+            pendingWork: client.pendingWork || 0,
+            completedWork: client.completedWork || 0,
         });
         setIsDialogOpen(true);
     };
@@ -129,6 +145,8 @@ export default function AdminClientListPage() {
                 email: formData.email,
                 phone: formData.phone,
                 status: formData.status as 'ACTIVE' | 'INACTIVE',
+                pendingWork: formData.pendingWork,
+                completedWork: formData.completedWork,
             };
 
             if (editingClient) {
@@ -148,6 +166,27 @@ export default function AdminClientListPage() {
             month: "short",
             year: "numeric",
         });
+    };
+
+    const handleExport = async () => {
+        try {
+            const { clientService } = await import("@/services/clientService");
+            const response = await clientService.getAllClients({ ...filters, limit: 'all' });
+            
+            const exportData = response.clients.map((client: any) => ({
+                "Client Name": client.name,
+                "Company": client.companyName,
+                "Email": client.email || "",
+                "Phone": client.phone || "",
+                "Status": client.status,
+                "Pending Work": client.pendingWork || 0,
+                "Completed Work": client.completedWork || 0,
+                "Joined Date": formatDate(client.joinedDate || client.createdAt)
+            }));
+            downloadCSV(exportData, "admin_clients_export");
+        } catch (error) {
+            toast.error("Failed to export clients");
+        }
     };
 
     if (loading && clients.length === 0) {
@@ -251,6 +290,32 @@ export default function AdminClientListPage() {
                                             </Select>
                                         </div>
                                     </div>
+                                    {editingClient && (
+                                        <div className="grid grid-cols-2 gap-4 pt-2">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="pendingWork" className="text-slate-700">Pending Work</Label>
+                                                <Input
+                                                    id="pendingWork"
+                                                    type="number"
+                                                    min="0"
+                                                    value={formData.pendingWork}
+                                                    onChange={(e) => setFormData({ ...formData, pendingWork: parseInt(e.target.value) || 0 })}
+                                                    className="border-slate-200 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="completedWork" className="text-slate-700">Completed Work</Label>
+                                                <Input
+                                                    id="completedWork"
+                                                    type="number"
+                                                    min="0"
+                                                    value={formData.completedWork}
+                                                    onChange={(e) => setFormData({ ...formData, completedWork: parseInt(e.target.value) || 0 })}
+                                                    className="border-slate-200 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
@@ -265,7 +330,7 @@ export default function AdminClientListPage() {
                         </DialogContent>
                     </Dialog>
 
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={handleExport}>
                         <Download className="mr-2 h-4 w-4" /> Export My List
                     </Button>
                 </div>
@@ -317,11 +382,11 @@ export default function AdminClientListPage() {
                                 <Input
                                     placeholder="Search my clients..."
                                     className="pl-8"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    value={localSearch}
+                                    onChange={(e) => setLocalSearch(e.target.value)}
                                 />
                             </div>
-                            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <Select value={filters.status || "all"} onValueChange={handleStatusChange}>
                                 <SelectTrigger className="w-[130px]">
                                     <SelectValue placeholder="Status" />
                                 </SelectTrigger>
@@ -348,14 +413,14 @@ export default function AdminClientListPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredClients.length === 0 ? (
+                            {clients.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                                         No clients found assigned to you.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredClients.map((client) => (
+                                clients.map((client) => (
                                     <TableRow key={client._id}>
                                         <TableCell className="font-medium">
                                             <div className="flex items-center gap-3">
@@ -385,7 +450,7 @@ export default function AdminClientListPage() {
                                                 <span className="text-green-600">Done: {client.completedWork}</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-slate-500 text-sm">{formatDate(client.joinedDate)}</TableCell>
+                                        <TableCell className="text-slate-500 text-sm">{formatDate(client.joinedDate || client.createdAt)}</TableCell>
                                         <TableCell className="text-right">
                                             <Button
                                                 variant="ghost"
@@ -401,6 +466,33 @@ export default function AdminClientListPage() {
                             )}
                         </TableBody>
                     </Table>
+
+                    {/* Pagination Controls */}
+                    {pagination.totalPages > 1 && (
+                        <div className="flex items-center justify-between px-2 py-4 border-t">
+                            <div className="text-sm text-slate-500">
+                                Showing page {pagination.page} of {pagination.totalPages} ({pagination.totalCount} total)
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage(Math.max(1, pagination.page - 1))}
+                                    disabled={pagination.page === 1}
+                                >
+                                    Previous
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage(Math.min(pagination.totalPages, pagination.page + 1))}
+                                    disabled={pagination.page === pagination.totalPages}
+                                >
+                                    Next
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </div>

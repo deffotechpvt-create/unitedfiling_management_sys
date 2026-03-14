@@ -21,8 +21,12 @@ module.exports = {
   // Compliance Status
   COMPLIANCE_STATUS: {
     PENDING: 'PENDING',
-    DELAYED: 'DELAYED',
+    NEEDS_ACTION: 'NEEDS_ACTION',
+    IN_PROGRESS: 'IN_PROGRESS',
+    WAITING_FOR_CLIENT: 'WAITING_FOR_CLIENT',
     COMPLETED: 'COMPLETED',
+    DELAYED: 'DELAYED',
+    OVERDUE: 'OVERDUE',
     FILING_DONE: 'FILING_DONE',
   },
 
@@ -44,8 +48,9 @@ module.exports = {
   // Departments (based on common compliance categories)
   DEPARTMENTS: {
     TAX: 'Direct Tax',
-    SECRETARIAL: 'Corporate Secretarial',
-    HR: 'HR / Labour Compliance',
+    GST: 'GST',
+    ROC: 'Corporate Secretarial',
+    HR: 'HR/ Labour Compliance',
     ACCOUNTS: 'Accounts Department',
     OTHER: 'Other',
   },
@@ -56,11 +61,12 @@ module.exports = {
     LAWYER: 'LAWYER',
   },
 
-  // Consultation Status
   CONSULTATION_STATUS: {
-    PAYMENT_PENDING: 'PAYMENT_PENDING',
-    SCHEDULED: 'SCHEDULED',
+    PENDING: 'PENDING',
+    CONFIRMED: 'CONFIRMED',
+    IN_PROGRESS: 'IN_PROGRESS',
     COMPLETED: 'COMPLETED',
+    CANCELLED: 'CANCELLED',
   },
 
   // Company Member Roles
@@ -95,5 +101,12 @@ module.exports = {
   RATE_LIMIT: {
     WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000, // 15 minutes
     MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  },
+
+  // Onboarding Tasks
+  ONBOARDING_TASKS: {
+    EXPLORE_SERVICES: 'exploreServices',
+    EXPLORE_DOCUMENTS: 'exploreDocuments',
+    CONSULT_EXPERT: 'consultExpert',
   },
 };

@@ -51,6 +51,15 @@ const UserSchema = new mongoose.Schema({
         type: Date,
     },
 
+    resetPasswordToken: String,
+    resetPasswordExpires: Date,
+
+    onboardingTasks: {
+        exploreServices: { type: Boolean, default: false },
+        exploreDocuments: { type: Boolean, default: false },
+        consultExpert: { type: Boolean, default: false },
+    },
+
     createdAt: {
         type: Date,
         default: Date.now,
@@ -100,7 +109,8 @@ UserSchema.methods.comparePassword = async function (candidatePassword) {
  */
 UserSchema.methods.canAddClient = function () {
     if (this.role !== constants.ROLES.ADMIN) return false;
-    return this.managedClients.length < constants.MAX_CLIENTS_PER_ADMIN;
+    const count = this.managedClients ? this.managedClients.length : 0;
+    return count < constants.MAX_CLIENTS_PER_ADMIN;
 };
 
 /**
@@ -175,7 +185,8 @@ UserSchema.virtual('clientCount').get(function () {
  */
 UserSchema.virtual('isAtCapacity').get(function () {
     if (this.role !== constants.ROLES.ADMIN) return false;
-    return this.managedClients.length >= constants.MAX_CLIENTS_PER_ADMIN;
+    const count = this.managedClients ? this.managedClients.length : 0;
+    return count >= constants.MAX_CLIENTS_PER_ADMIN;
 });
 
 /**
@@ -183,7 +194,8 @@ UserSchema.virtual('isAtCapacity').get(function () {
  */
 UserSchema.virtual('availableSlots').get(function () {
     if (this.role !== constants.ROLES.ADMIN) return 0;
-    return Math.max(0, constants.MAX_CLIENTS_PER_ADMIN - this.managedClients.length);
+    const count = this.managedClients ? this.managedClients.length : 0;
+    return Math.max(0, constants.MAX_CLIENTS_PER_ADMIN - count);
 });
 
 // 7. Query Helpers

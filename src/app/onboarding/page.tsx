@@ -20,7 +20,6 @@ export default function OnboardingPage() {
 
     // Debug/Dev: Log current step
     useEffect(() => {
-        console.log("Current Step:", currentStep);
     }, [currentStep]);
 
     if (currentStep >= 7) {
