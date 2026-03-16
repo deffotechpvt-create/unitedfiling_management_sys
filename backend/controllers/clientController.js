@@ -79,6 +79,7 @@ const getAllClients = asyncHandler(async (req, res) => {
     let clientsQuery = Client.find(query)
         .populate('assignedAdmin', 'name email')
         .populate('userId', 'name email')
+        .select('-__v')
         .sort({ createdAt: -1 });
 
     if (limit > 0) {
@@ -107,7 +108,8 @@ const getClientById = asyncHandler(async (req, res) => {
     const client = await Client.findById(req.params.id)
         .populate('assignedAdmin', 'name email phone')
         .populate('userId', 'name email')
-        .populate('companies');
+        .populate('companies')
+        .select('-__v');
 
     if (!client) {
         throw new ApiError(404, 'Client not found');
@@ -248,14 +250,7 @@ const deleteClient = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Client not found');
     }
 
-    // Remove from admin's managedClients if assigned
-    if (client.assignedAdmin) {
-        await User.findByIdAndUpdate(
-            client.assignedAdmin,
-            { $pull: { managedClients: client._id } }
-        );
-    }
-
+    // Removal from User.managedClients is handled by Mongoose middleware in Client model (pre findOneAndDelete)
     await Client.findByIdAndDelete(req.params.id);
 
     res.status(200).json(

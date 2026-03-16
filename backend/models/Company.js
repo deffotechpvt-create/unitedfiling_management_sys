@@ -29,25 +29,17 @@ const CompanySchema = new mongoose.Schema({
         city: { type: String, trim: true },
         state: { type: String, trim: true },
         pincode: { type: String, trim: true },
-        country: {
-            type: String,
-            default: 'India',
-            trim: true,
-        },
+        country: { type: String, default: 'India', trim: true },
     },
     industry: {
         type: String,
         trim: true,
     },
-
-    // Ownership
     client: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Client',
         required: [true, 'Client reference is required'],
     },
-
-    // Members (if multiple users access same company)
     members: [{
         user: {
             type: mongoose.Schema.Types.ObjectId,
@@ -67,7 +59,6 @@ const CompanySchema = new mongoose.Schema({
             default: Date.now,
         },
     }],
-
     status: {
         type: String,
         enum: {
@@ -93,76 +84,84 @@ CompanySchema.index({ client: 1, status: 1 });
 
 /**
  * Post-save: Add company to client's companies array
+ * ✅ CLEAN — no auto-compliance here (handled by companyController.js)
  */
 CompanySchema.post('save', async function (doc) {
-    const Client = mongoose.model('Client');
-    await Client.findByIdAndUpdate(
-        doc.client,
-        { $addToSet: { companies: doc._id } }
-    );
+    try {
+        const Client = mongoose.model('Client');
+        await Client.findByIdAndUpdate(doc.client, {
+            $addToSet: { companies: doc._id }
+        });
+    } catch (err) {
+        console.error('❌ Failed to update client companies array:', err.message);
+    }
 });
 
 /**
- * Pre-remove: Remove company from client's companies array
+ * Handle Cleanup on Delete
  */
-CompanySchema.pre('remove', async function (next) {
-    const Client = mongoose.model('Client');
-    await Client.findByIdAndUpdate(
-        this.client,
-        { $pull: { companies: this._id } }
-    );
-    next();
+CompanySchema.pre('deleteOne', { document: true, query: false }, async function (next) {
+    try {
+        const Client = mongoose.model('Client');
+        const Compliance = mongoose.model('Compliance');
+        const CalendarEvent = mongoose.model('CalendarEvent');
+
+        // Remove from Client's companies array
+        await Client.findByIdAndUpdate(this.client, { $pull: { companies: this._id } });
+
+        // Delete associated compliances (which will trigger their own hooks for calendar events if using deleteOne on docs, but we'll do bulk for safety)
+        await Compliance.deleteMany({ company: this._id });
+        await CalendarEvent.deleteMany({ company: this._id });
+
+        next();
+    } catch (err) {
+        next(err);
+    }
+});
+
+CompanySchema.pre('findOneAndDelete', async function (next) {
+    try {
+        const docToDelete = await this.model.findOne(this.getQuery());
+        if (docToDelete) {
+            const Client = mongoose.model('Client');
+            const Compliance = mongoose.model('Compliance');
+            const CalendarEvent = mongoose.model('CalendarEvent');
+
+            await Client.findByIdAndUpdate(docToDelete.client, { $pull: { companies: docToDelete._id } });
+            await Compliance.deleteMany({ company: docToDelete._id });
+            await CalendarEvent.deleteMany({ company: docToDelete._id });
+        }
+        next();
+    } catch (err) {
+        next(err);
+    }
 });
 
 // 4. Instance Methods
 
-/**
- * Add member to company
- */
 CompanySchema.methods.addMember = async function (userId, role = constants.COMPANY_ROLES.VIEWER) {
-    // Check if user already exists
     const exists = this.members.some(m => m.user.toString() === userId.toString());
-
-    if (exists) {
-        throw new Error('User is already a member of this company');
-    }
-
+    if (exists) throw new Error('User is already a member of this company');
     this.members.push({ user: userId, role });
     return this.save();
 };
 
-/**
- * Remove member from company
- */
 CompanySchema.methods.removeMember = async function (userId) {
     this.members = this.members.filter(m => m.user.toString() !== userId.toString());
     return this.save();
 };
 
-/**
- * Update member role
- */
 CompanySchema.methods.updateMemberRole = async function (userId, newRole) {
     const member = this.members.find(m => m.user.toString() === userId.toString());
-
-    if (!member) {
-        throw new Error('User is not a member of this company');
-    }
-
+    if (!member) throw new Error('User is not a member of this company');
     member.role = newRole;
     return this.save();
 };
 
-/**
- * Check if user is member
- */
 CompanySchema.methods.isMember = function (userId) {
     return this.members.some(m => m.user.toString() === userId.toString());
 };
 
-/**
- * Get user's role in company
- */
 CompanySchema.methods.getUserRole = function (userId) {
     const member = this.members.find(m => m.user.toString() === userId.toString());
     return member ? member.role : null;
@@ -170,26 +169,14 @@ CompanySchema.methods.getUserRole = function (userId) {
 
 // 5. Static Methods
 
-/**
- * Find companies by client
- */
 CompanySchema.statics.findByClient = function (clientId) {
     return this.find({ client: clientId, status: constants.STATUS.ACTIVE });
 };
 
-/**
- * Find companies where user is a member
- */
 CompanySchema.statics.findByMember = function (userId) {
-    return this.find({
-        'members.user': userId,
-        status: constants.STATUS.ACTIVE,
-    });
+    return this.find({ 'members.user': userId, status: constants.STATUS.ACTIVE });
 };
 
-/**
- * Search companies by name
- */
 CompanySchema.statics.searchByName = function (searchTerm) {
     return this.find({
         name: { $regex: searchTerm, $options: 'i' },
@@ -199,35 +186,21 @@ CompanySchema.statics.searchByName = function (searchTerm) {
 
 // 6. Virtuals
 
-/**
- * Virtual: Member count
- */
 CompanySchema.virtual('memberCount').get(function () {
     return this.members ? this.members.length : 0;
 });
 
-/**
- * Virtual: Full address
- */
 CompanySchema.virtual('fullAddress').get(function () {
     const { street, city, state, pincode, country } = this.address || {};
-    return [street, city, state, pincode, country]
-        .filter(Boolean)
-        .join(', ');
+    return [street, city, state, pincode, country].filter(Boolean).join(', ');
 });
 
 // 7. Query Helpers
 
-/**
- * Filter active companies
- */
 CompanySchema.query.active = function () {
     return this.where({ status: constants.STATUS.ACTIVE });
 };
 
-/**
- * Filter by client
- */
 CompanySchema.query.byClient = function (clientId) {
     return this.where({ client: clientId });
 };

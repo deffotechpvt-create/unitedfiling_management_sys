@@ -36,6 +36,8 @@ import { useSuperAdmin } from "@/context/super-admin-context";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { downloadCSV } from "@/lib/export";
+import { canDelete } from "@/lib/roles";
+import { useAuth } from "@/context/auth-context";
 
 export default function ClientListPage() {
     const {
@@ -55,6 +57,7 @@ export default function ClientListPage() {
     } = useClient();
     const { selectedCompany } = useCompany();
     const { admins, refreshAdmins } = useSuperAdmin();
+    const { user } = useAuth();
 
     // Dialog State
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -543,14 +546,16 @@ export default function ClientListPage() {
                                                         >
                                                             <Pencil className="h-4 w-4 text-slate-500 hover:text-blue-600" />
                                                         </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="h-8 w-8 p-0"
-                                                            onClick={() => handleDelete(client._id)}
-                                                        >
-                                                            <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-600" />
-                                                        </Button>
+                                                         {canDelete(user?.role) && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-8 w-8 p-0"
+                                                                onClick={() => handleDelete(client._id)}
+                                                            >
+                                                                <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-600" />
+                                                            </Button>
+                                                         )}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>

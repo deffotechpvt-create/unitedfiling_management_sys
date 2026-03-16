@@ -13,6 +13,7 @@ import { ServiceProvider } from "@/context/service-context"
 import { ConsultationProvider } from "@/context/consultation-context"
 import { DocumentProvider } from "@/context/document-context"
 import { ReportProvider } from "@/context/report-context"
+import { CalendarProvider } from "@/context/calendar-context"
 
 const queryClient = new QueryClient()
 
@@ -28,7 +29,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
                                     <ConsultationProvider>
                                         <DocumentProvider>
                                             <ReportProvider>
-                                                {children}
+                                                <CalendarProvider>
+                                                    {children}
+                                                </CalendarProvider>
                                                 <Toaster />
                                             </ReportProvider>
                                         </DocumentProvider>

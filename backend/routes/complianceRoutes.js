@@ -23,6 +23,9 @@ router.get('/', complianceController.getAllCompliances);
 // Same scoping as getAllCompliances
 router.get('/stats', complianceController.getComplianceStats);
 
+// GET /api/compliances/export
+router.get('/export', checkRole(SUPER_ADMIN, ADMIN), complianceController.exportCompliances);
+
 // GET /api/compliances/templates
 // ADMIN and SUPER_ADMIN only — USERs have no use for template management
 router.get('/templates', checkRole(SUPER_ADMIN, ADMIN), complianceController.getTemplates);
@@ -55,19 +58,12 @@ router.delete('/templates/:id', checkRole(SUPER_ADMIN), complianceController.del
 // ADMIN is further scoped by controller (assigned-client companies only)
 router.patch('/:id', checkRole(SUPER_ADMIN, ADMIN), complianceController.updateCompliance);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ATTACHMENT / NOTES ROUTE — All authenticated roles
-// USER: can only upload documents/notes for their own companies' compliances
-// ADMIN: can upload for their assigned-client companies
-// SUPER_ADMIN: unrestricted
-// NOTE: Controller enforces ownership — this route does NOT change status/stage/assignment
-// ─────────────────────────────────────────────────────────────────────────────
 
 // PATCH /api/compliances/:id/attachments
 router.patch('/:id/attachments', complianceController.addAttachment);
 
 // DELETE /api/compliances/bulk
-// Bulk delete compliances — ADMIN/SUPER_ADMIN only
-router.delete('/bulk', checkRole(SUPER_ADMIN, ADMIN), complianceController.bulkDeleteCompliances);
+// Bulk delete compliances — SUPER_ADMIN only
+router.delete('/bulk', checkRole(SUPER_ADMIN), complianceController.bulkDeleteCompliances);
 
 module.exports = router;

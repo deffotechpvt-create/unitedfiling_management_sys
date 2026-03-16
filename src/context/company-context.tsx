@@ -28,6 +28,7 @@ interface CompanyContextType {
     updateMemberRole: (companyId: string, userId: string, role: "OWNER" | "EDITOR" | "VIEWER") => Promise<boolean>
     refreshAll: (force?: boolean) => Promise<void>
     getAddableUsers: (companyId: string) => Promise<any[]>
+    exportAllCompanies: (filters?: CompanyFilters) => Promise<void>
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined)
@@ -67,7 +68,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         if (isFetching.current.companies) return;
         isFetching.current.companies = true;
 
-        setLoading(true)
+        if (companies.length === 0) setLoading(true)
         setError(null)
 
         try {
@@ -136,12 +137,11 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     // Mutations
     // ========================================
     const createCompany = useCallback(async (data: any): Promise<Company | null> => {
-        setLoading(true)
         try {
             const response = await companyService.createCompany(data)
-            await refreshAll(true)
+            refreshAll(true)
             setSelectedCompanyState(response.company)
-            toast.success("Company created successfully!")
+            toast.success("Company created")
             return response.company
         } catch (err: any) {
             toast.error(err?.response?.data?.message || "Failed to create company")
@@ -152,35 +152,36 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     }, [refreshAll])
 
     const updateCompany = useCallback(async (id: string, data: any): Promise<Company | null> => {
-        setLoading(true)
+        const previousCompanies = [...companies];
+        setCompanies(prev => prev.map(c => c._id === id ? { ...c, ...data } as Company : c));
+
         try {
             const response = await companyService.updateCompany(id, data)
             setCompanies(prev => prev.map(c => c._id === id ? response.company : c))
             if (selectedCompany?._id === id) setSelectedCompanyState(response.company)
-            toast.success("Company updated successfully!")
+            toast.success("Company updated")
             return response.company
         } catch (err: any) {
+            setCompanies(previousCompanies);
             toast.error(err?.response?.data?.message || "Failed to update company")
             return null
-        } finally {
-            setLoading(false)
         }
-    }, [selectedCompany])
+    }, [selectedCompany, companies])
 
     const deleteCompany = useCallback(async (id: string): Promise<boolean> => {
-        setLoading(true)
+        const previousCompanies = [...companies];
+        setCompanies(prev => prev.filter(c => c._id !== id))
+        if (selectedCompany?._id === id) setSelectedCompanyState(companies.find(c => c._id !== id) || null)
+
         try {
             await companyService.deleteCompany(id)
-            setCompanies(prev => prev.filter(c => c._id !== id))
-            if (selectedCompany?._id === id) setSelectedCompanyState(companies[0] || null)
-            toast.success("Company deleted successfully!")
+            toast.success("Company deleted")
             fetchStats(true)
             return true
         } catch (err: any) {
+            setCompanies(previousCompanies);
             toast.error(err?.response?.data?.message || "Failed to delete company")
             return false
-        } finally {
-            setLoading(false)
         }
     }, [selectedCompany, companies, fetchStats])
 
@@ -189,7 +190,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
             const response = await companyService.addMember(companyId, { userId, role })
             setCompanies(prev => prev.map(c => c._id === companyId ? response.company : c))
             if (selectedCompany?._id === companyId) setSelectedCompanyState(response.company)
-            toast.success("Member added successfully!")
+            toast.success("Member added")
             return true
         } catch (err: any) {
             toast.error(err?.response?.data?.message || "Failed to add member")
@@ -202,7 +203,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
             const response = await companyService.removeMember(companyId, userId)
             setCompanies(prev => prev.map(c => c._id === companyId ? response.company : c))
             if (selectedCompany?._id === companyId) setSelectedCompanyState(response.company)
-            toast.success("Member removed successfully!")
+            toast.success("Member removed")
             return true
         } catch (err: any) {
             toast.error(err?.response?.data?.message || "Failed to remove member")
@@ -215,7 +216,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
             const response = await companyService.updateMemberRole(companyId, userId, { role })
             setCompanies(prev => prev.map(c => c._id === companyId ? response.company : c))
             if (selectedCompany?._id === companyId) setSelectedCompanyState(response.company)
-            toast.success("Member role updated successfully!")
+            toast.success("Role updated")
             return true
         } catch (err: any) {
             toast.error(err?.response?.data?.message || "Failed to update member role")
@@ -237,6 +238,32 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
             return []
         }
     }, [user])
+
+    const exportAllCompanies = useCallback(async (customFilters?: CompanyFilters) => {
+        setLoading(true)
+        try {
+            const activeFilters = { ...filters, ...(customFilters || {}) }
+            const blob = await companyService.exportCompanies(activeFilters)
+            
+            // Create download link
+            const url = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.setAttribute('download', `companies_export_${new Date().toISOString().split('T')[0]}.csv`)
+            document.body.appendChild(link)
+            link.click()
+            
+            // Cleanup
+            link.parentNode?.removeChild(link)
+            window.URL.revokeObjectURL(url)
+            
+            toast.success("Companies exported successfully!")
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || "Failed to export companies")
+        } finally {
+            setLoading(false)
+        }
+    }, [filters])
 
     const setSelectedCompany = useCallback((company: Company | null) => {
         setSelectedCompanyState(company)
@@ -298,6 +325,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
                 updateMemberRole,
                 refreshAll,
                 getAddableUsers,
+                exportAllCompanies,
             }}
         >
             {children}

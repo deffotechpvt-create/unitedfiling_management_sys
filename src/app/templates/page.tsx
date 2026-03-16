@@ -35,7 +35,14 @@ import { ROLES } from "@/lib/roles";
 import { toast } from "sonner";
 
 export default function TemplatesPage() {
-    const { templates, fetchTemplates, createTemplate, updateTemplate, deleteTemplate, loading } = useCompliance();
+    const { 
+        templates, 
+        fetchTemplates, 
+        createTemplate, 
+        updateTemplate, 
+        deleteTemplate, 
+        loading,
+    } = useCompliance();
     const [searchTerm, setSearchTerm] = useState("");
     
     // Modal states
@@ -144,7 +151,7 @@ export default function TemplatesPage() {
 
     return (
         <RoleGuard allowedRoles={[ROLES.SUPER_ADMIN]}>
-            <div className="space-y-6 p-6 h-full flex flex-col">
+            <div className="space-y-6 p-6 pb-20 max-w-7xl mx-auto">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Compliance Templates</h1>
@@ -169,7 +176,7 @@ export default function TemplatesPage() {
                 </div>
 
                 {/* Templates Table */}
-                <div className="bg-white border rounded-xl shadow-sm overflow-hidden flex-1">
+                <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader className="bg-slate-50 border-b">

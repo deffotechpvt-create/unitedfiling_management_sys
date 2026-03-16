@@ -110,7 +110,7 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
         isFetching.current.admins = true;
 
         try {
-            setLoading(true);
+            if (admins.length === 0) setLoading(true);
             setError(null);
             const response = await userService.getAllAdmins(selectedCompany?._id);
 
@@ -149,7 +149,7 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
         isFetching.current.clients = true;
 
         try {
-            setLoading(true);
+            if (clients.length === 0) setLoading(true);
             const response = await clientService.getAllClients({ company: selectedCompany?._id });
 
             const transformedClients: Client[] = response.clients.map((client) => ({
@@ -191,7 +191,7 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
         isFetching.current.users = true;
 
         try {
-            setLoading(true);
+            if (allUsers.length === 0) setLoading(true);
             const response = await userService.getAllUsers();
             setAllUsers(response.users);
             lastFetchTime.current.users = Date.now();
@@ -235,8 +235,8 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
 
         try {
             // 2. Call API in background
-            const response = await userService.updateAdminStatus(adminId, { status: newStatus });
-            toast.success(response.message || `Admin ${newStatus.toLowerCase()}d successfully`);
+            await userService.updateAdminStatus(adminId, { status: newStatus });
+            toast.success(`Admin ${newStatus.toLowerCase()}d`);
         } catch (err: any) {
             // 3. Rollback on error
             setAdmins(previousAdmins);
@@ -247,10 +247,9 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
     // ✅ OPTIMISTIC: Create new admin (only show loading for create)
     const addAdmin = async (name: string, email: string, password: string, phone?: string) => {
         try {
-            setLoading(true); // Keep loading for creation
-            const response = await userService.createAdmin({ name, email, password, phone });
-            toast.success(response.message || "Admin created successfully");
-            await refreshAdmins();
+            await userService.createAdmin({ name, email, password, phone });
+            toast.success("Admin created");
+            await refreshAdmins(true);
         } catch (err: any) {
             console.error("Error creating admin:", err);
             toast.error(err.response?.data?.message || "Failed to create admin");
@@ -269,9 +268,9 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
 
         try {
             // 2. Call API in background
-            const response = await userService.deleteAdmin(adminId);
-            toast.success(response.message || "Admin deleted successfully");
-            await refreshAllUsers(); // Sync users list in background
+            await userService.deleteAdmin(adminId);
+            toast.success("Admin deleted");
+            refreshAllUsers(true); // Sync users list in background
         } catch (err: any) {
             console.error("Error deleting admin:", err);
             // 3. Rollback on error
@@ -299,8 +298,8 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
 
         try {
             // 2. Call API in background
-            const response = await userService.updateUserStatus(userId, { status: newStatus });
-            toast.success(response.message || `User status updated to ${newStatus}`);
+            await userService.updateUserStatus(userId, { status: newStatus });
+            toast.success(`User status updated to ${newStatus}`);
         } catch (err: any) {
             console.error("Error updating user status:", err);
             // 3. Rollback on error
@@ -321,8 +320,8 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
 
         try {
             // 2. Call API in background
-            const response = await userService.deleteUser(userId);
-            toast.success(response.message || "User deleted successfully");
+            await userService.deleteUser(userId);
+            toast.success("User deleted");
         } catch (err: any) {
             console.error("Error deleting user:", err);
             // 3. Rollback on error
@@ -347,13 +346,12 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
 
         try {
             // 2. Call API in background
-            let response;
             if (newAdminId) {
-                response = await clientService.assignClientToAdmin(clientId, newAdminId);
+                await clientService.assignClientToAdmin(clientId, newAdminId);
             } else {
-                response = await clientService.unassignClient(clientId);
+                await clientService.unassignClient(clientId);
             }
-            toast.success(response.message || "Client assignment updated");
+            toast.success("Assignment updated");
 
             // Refresh in background to get accurate counts
             refreshAdmins();
@@ -370,10 +368,9 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
     // Keep loading for create operations
     const addClient = async (data: any) => {
         try {
-            setLoading(true);
-            const response = await clientService.createClient(data);
-            toast.success(response.message || "Client added successfully");
-            await refreshClients();
+            await clientService.createClient(data);
+            toast.success("Client added");
+            refreshClients(true);
         } catch (err: any) {
             console.error("Error adding client:", err);
             toast.error(err.response?.data?.message || "Failed to add client");
@@ -394,8 +391,8 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
 
         try {
             // 2. Call API in background
-            const response = await clientService.updateClient(clientId, updates as any);
-            toast.success(response.message || "Client updated successfully");
+            await clientService.updateClient(clientId, updates as any);
+            toast.success("Client updated");
         } catch (err: any) {
             console.error("Error updating client:", err);
             // 3. Rollback on error

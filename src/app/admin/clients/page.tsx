@@ -400,72 +400,74 @@ export default function AdminClientListPage() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Client Name</TableHead>
-                                <TableHead>Company</TableHead>
-                                <TableHead>Contact</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Work Load</TableHead>
-                                <TableHead>Joined</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {clients.length === 0 ? (
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
-                                        No clients found assigned to you.
-                                    </TableCell>
+                                    <TableHead>Client Name</TableHead>
+                                    <TableHead>Company</TableHead>
+                                    <TableHead>Contact</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Work Load</TableHead>
+                                    <TableHead>Joined</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
-                            ) : (
-                                clients.map((client) => (
-                                    <TableRow key={client._id}>
-                                        <TableCell className="font-medium">
-                                            <div className="flex items-center gap-3">
-                                                <Avatar className="h-8 w-8">
-                                                    <AvatarFallback className="bg-blue-100 text-blue-700">
-                                                        {client.name.slice(0, 2).toUpperCase()}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                {client.name}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>{client.companyName}</TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col text-xs text-slate-500">
-                                                <span>{client.email || "-"}</span>
-                                                <span>{client.phone || "-"}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge variant={client.status === "ACTIVE" ? "default" : "secondary"}>
-                                                {client.status}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col text-xs">
-                                                <span className="text-orange-600 font-medium">Pending: {client.pendingWork}</span>
-                                                <span className="text-green-600">Done: {client.completedWork}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-slate-500 text-sm">{formatDate(client.joinedDate || client.createdAt)}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-8 w-8 p-0"
-                                                onClick={() => handleOpenEdit(client)}
-                                            >
-                                                <Pencil className="h-4 w-4 text-slate-500 hover:text-blue-600" />
-                                            </Button>
+                            </TableHeader>
+                            <TableBody>
+                                {clients.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                                            No clients found assigned to you.
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
+                                ) : (
+                                    clients.map((client) => (
+                                        <TableRow key={client._id}>
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-3">
+                                                    <Avatar className="h-8 w-8">
+                                                        <AvatarFallback className="bg-blue-100 text-blue-700">
+                                                            {client.name.slice(0, 2).toUpperCase()}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    {client.name}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>{client.companyName}</TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col text-xs text-slate-500">
+                                                    <span>{client.email || "-"}</span>
+                                                    <span>{client.phone || "-"}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant={client.status === "ACTIVE" ? "default" : "secondary"}>
+                                                    {client.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col text-xs">
+                                                    <span className="text-orange-600 font-medium">Pending: {client.pendingWork}</span>
+                                                    <span className="text-green-600">Done: {client.completedWork}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-slate-500 text-sm">{formatDate(client.joinedDate || client.createdAt)}</TableCell>
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0"
+                                                    onClick={() => handleOpenEdit(client)}
+                                                >
+                                                    <Pencil className="h-4 w-4 text-slate-500 hover:text-blue-600" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
 
                     {/* Pagination Controls */}
                     {pagination.totalPages > 1 && (

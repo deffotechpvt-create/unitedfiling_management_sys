@@ -190,12 +190,26 @@ exports.getMyConsultations = asyncHandler(async (req, res) => {
         if (req.query.expertId) query.assignedExpert = req.query.expertId;
     }
 
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const totalCount = await Consultation.countDocuments(query);
     const consultations = await Consultation.find(query)
         .populate('assignedExpert', 'name email')
-        .sort({ createdAt: -1 });
+        .select('-__v')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
 
     res.status(200).json(new ApiResponse(200, {
         consultations,
+        pagination: {
+            totalCount,
+            totalPages: Math.ceil(totalCount / limit),
+            currentPage: page,
+            limit
+        },
         message: 'Consultations retrieved successfully'
     }));
 });

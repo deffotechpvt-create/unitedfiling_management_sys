@@ -86,6 +86,7 @@ const getHighRiskCompliances = asyncHandler(async (req, res) => {
         .populate('company', 'name')
         .populate('client', 'name')
         .populate('assignedTo', 'name')
+        .select('-payment -notes -attachments -__v')
         .sort({ dueDate: 1 });
 
     res.status(200).json(

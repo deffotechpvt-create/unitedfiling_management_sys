@@ -11,8 +11,12 @@ export interface Compliance {
     dueDate: string;
     stage: string;
     status: string;
+    price?: number;
     createdAt: string;
     updatedAt: string;
+    department: string;
+    risk: string;
+    attachments: (string | { name: string; url: string })[];
     assignedTo?: string | { _id: string; name: string } | null;
 }
 
@@ -26,6 +30,7 @@ export interface ComplianceStats {
     delayed: number;
     overdue: number;
     upcoming: number;
+    cancelled: number;
 }
 
 export interface ComplianceTemplate {
@@ -50,19 +55,29 @@ export interface UpdateComplianceData {
 }
 
 export const complianceService = {
-    getCompliances: async (filters: { company?: string; department?: string; category?: string | string[]; search?: string } = {}): Promise<{ compliances: Compliance[] }> => {
+    getCompliances: async (filters: { company?: string; department?: string; category?: string | string[]; search?: string; page?: number; limit?: number } = {}): Promise<{ compliances: Compliance[]; totalPages?: number; currentPage?: number; totalDocs?: number }> => {
         const { data } = await api.get("/compliances", { params: filters });
         return {
             compliances: data.compliances.map((c: any) => ({
                 ...c,
                 id: c._id
-            }))
+            })),
+            totalPages: data.totalPages,
+            currentPage: data.currentPage,
+            totalDocs: data.count
         };
     },
 
     getComplianceStats: async (filters: { company?: string; department?: string; category?: string | string[]; search?: string } = {}): Promise<{ stats: ComplianceStats }> => {
         const { data } = await api.get("/compliances/stats", { params: filters });
         return { stats: data.stats };
+    },
+    exportCompliances: async (filters: any = {}): Promise<Blob> => {
+        const { data } = await api.get("/compliances/export", { 
+            params: filters,
+            responseType: 'blob'
+        });
+        return data;
     },
 
     updateCompliance: async (id: string, data: UpdateComplianceData): Promise<{ compliance: Compliance }> => {
@@ -95,8 +110,8 @@ export const complianceService = {
         return data;
     },
 
-    addAttachment: async (id: string, url: string, note?: string): Promise<any> => {
-        const { data } = await api.patch(`/compliances/${id}/attachments`, { url, note });
+    addAttachment: async (id: string, url: string, name?: string, note?: string): Promise<any> => {
+        const { data } = await api.patch(`/compliances/${id}/attachments`, { url, name, note });
         return data;
     },
     deleteCompliances: async (ids: string[]): Promise<any> => {

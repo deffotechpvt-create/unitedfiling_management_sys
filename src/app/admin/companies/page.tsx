@@ -37,7 +37,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { ManageMembersDialog } from "@/components/company/ManageMembersDialog";
-import { canManageCompanies, isAdmin } from "@/lib/roles";
+import { canManageCompanies, isAdmin, canDelete } from "@/lib/roles";
 import { downloadCSV } from "@/lib/export";
 
 export default function AdminCompanyListPage() {
@@ -532,7 +532,7 @@ export default function AdminCompanyListPage() {
                                         <TableCell>
                                             <div className="flex items-center gap-1">
                                                 <Users className="h-3 w-3 text-slate-400" />
-                                                <span className="text-xs text-slate-600">{company.members?.length || 0}</span>
+                                                <span className="text-xs text-slate-600">{company.memberCount || 0}</span>
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right">
@@ -546,17 +546,19 @@ export default function AdminCompanyListPage() {
                                                     <Users className="h-3.5 w-3.5 mr-1.5 text-slate-400 group-hover:text-blue-600" />
                                                     <span className="text-xs group-hover:text-blue-700">Members</span>
                                                 </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                                                    onClick={() => handleDelete(company._id)}
-                                                    title="Delete Company"
-                                                >
-                                                    <Badge variant="outline" className="border-none p-0 text-red-500">
-                                                        <Plus className="h-4 w-4 rotate-45" />
-                                                    </Badge>
-                                                </Button>
+                                                 {canDelete(user?.role) && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                                        onClick={() => handleDelete(company._id)}
+                                                        title="Delete Company"
+                                                    >
+                                                        <Badge variant="outline" className="border-none p-0 text-red-500">
+                                                            <Plus className="h-4 w-4 rotate-45" />
+                                                        </Badge>
+                                                    </Button>
+                                                 )}
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"

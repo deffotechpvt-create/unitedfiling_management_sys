@@ -17,6 +17,7 @@ export interface Document {
     createdAt: string;
     formattedSize?: string;
     fileExtension?: string;
+    status?: 'uploading' | 'error' | 'active';
 }
 
 export interface UploadDocumentData {
@@ -50,9 +51,15 @@ export const documentService = {
     },
 
     // List documents
-    async listDocuments(filters?: { companyId?: string; clientId?: string; folder?: string }): Promise<{ documents: Document[]; message: string }> {
+    async listDocuments(filters?: { companyId?: string; clientId?: string; folder?: string; page?: number; limit?: number }): Promise<{ documents: Document[]; totalPages?: number; currentPage?: number; totalDocs?: number; message: string }> {
         const { data: response } = await api.get('/documents', { params: filters });
-        return response;
+        return {
+            documents: response.documents,
+            totalPages: response.totalPages,
+            currentPage: response.currentPage,
+            totalDocs: response.count,
+            message: response.message
+        };
     },
 
     // Get document by ID

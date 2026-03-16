@@ -13,6 +13,7 @@ export type Role = typeof ROLES[keyof typeof ROLES];
 // Super Admin Permissions
 export const canManageAdmins = (role?: string) => role === ROLES.SUPER_ADMIN;
 export const canViewGlobalAnalytics = (role?: string) => role === ROLES.SUPER_ADMIN;
+export const canDelete = (role?: string) => role === ROLES.SUPER_ADMIN;
 
 // Admin & Super Admin Permissions
 export const canManageCompanies = (role?: string) => role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN;

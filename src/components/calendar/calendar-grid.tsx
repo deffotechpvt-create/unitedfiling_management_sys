@@ -1,33 +1,35 @@
-"use client"
+// src/components/calendar/calendar-grid.tsx
+"use client";
 
 import { useState } from "react";
-import { ComplianceEvent } from "./calendar-types";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths, isToday } from "date-fns";
+import { CalendarEvent, STATUS_CONFIG, SERVICE_TYPE_COLORS } from "./calendar-types";
+import {
+    format, startOfMonth, endOfMonth, eachDayOfInterval,
+    startOfWeek, endOfWeek, isSameMonth, isSameDay,
+    addMonths, subMonths, isToday
+} from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Filter, Search, Grid, List } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 
 interface CalendarGridProps {
-    events: ComplianceEvent[];
+    events: CalendarEvent[];
     currentDate: Date;
     onDateChange: (date: Date) => void;
-    onEventClick: (event: ComplianceEvent) => void;
+    onEventClick: (event: CalendarEvent) => void;
 }
 
 export function CalendarGrid({ events, currentDate, onDateChange, onEventClick }: CalendarGridProps) {
     const [searchTerm, setSearchTerm] = useState("");
-    const [showMandatoryOnly, setShowMandatoryOnly] = useState(false);
+    const [statusFilter, setStatusFilter] = useState<string>("all");
 
     // Filter Logic
     const filteredEvents = events.filter(e => {
         const matchesSearch = e.title.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesMandatory = showMandatoryOnly ? e.isMandatory : true;
-        return matchesSearch && matchesMandatory;
+        const matchesStatus = statusFilter === "all" ? true : e.displayStatus === statusFilter;
+        return matchesSearch && matchesStatus;
     });
 
     // Date Logic
@@ -35,22 +37,21 @@ export function CalendarGrid({ events, currentDate, onDateChange, onEventClick }
     const monthEnd = endOfMonth(currentDate);
     const startDate = startOfWeek(monthStart);
     const endDate = endOfWeek(monthEnd);
-
-    const days = eachDayOfInterval({
-        start: startDate,
-        end: endDate
-    });
-
+    const days = eachDayOfInterval({ start: startDate, end: endDate });
     const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
     const handlePrevMonth = () => onDateChange(subMonths(currentDate, 1));
     const handleNextMonth = () => onDateChange(addMonths(currentDate, 1));
+    const handleToday = () => onDateChange(new Date());
 
     return (
         <div className="flex-1 flex flex-col h-full bg-white">
+
             {/* Header Controls */}
             <div className="p-4 border-b space-y-4">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+
+                    {/* Month Navigation */}
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1 border rounded-md p-0.5 bg-slate-50">
                             <Button variant="ghost" size="icon" onClick={handlePrevMonth} className="h-7 w-7">
@@ -63,13 +64,13 @@ export function CalendarGrid({ events, currentDate, onDateChange, onEventClick }
                                 <ChevronRight className="h-4 w-4" />
                             </Button>
                         </div>
-                        <Button variant="outline" size="sm" className="hidden md:flex gap-2">
+                        <Button variant="outline" size="sm" onClick={handleToday} className="hidden md:flex">
                             Today
                         </Button>
                     </div>
 
+                    {/* Search */}
                     <div className="flex items-center gap-3 w-full md:w-auto">
-                        {/* Google Sync Button */}
                         <Button variant="outline" size="sm" className="gap-2 text-slate-600">
                             <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -79,8 +80,6 @@ export function CalendarGrid({ events, currentDate, onDateChange, onEventClick }
                             </svg>
                             <span className="hidden sm:inline">Sync with Google</span>
                         </Button>
-
-                        {/* Search */}
                         <div className="relative w-full md:w-64">
                             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
                             <Input
@@ -93,29 +92,45 @@ export function CalendarGrid({ events, currentDate, onDateChange, onEventClick }
                     </div>
                 </div>
 
-                {/* Filters Row */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center space-x-2 border rounded-md px-3 py-1.5 bg-slate-50">
-                            <Switch id="mandatory-mode" checked={showMandatoryOnly} onCheckedChange={setShowMandatoryOnly} />
-                            <Label htmlFor="mandatory-mode" className="text-xs font-medium cursor-pointer">
-                                Mandatory Only
-                            </Label>
-                        </div>
+                {/* Filter + Legend Row */}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+
+                    {/* Status Filter Pills */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {["all", "pending", "overdue", "completed"].map((s) => (
+                            <button
+                                key={s}
+                                onClick={() => setStatusFilter(s)}
+                                className={cn(
+                                    "text-xs px-3 py-1 rounded-full border font-medium transition-colors capitalize",
+                                    statusFilter === s
+                                        ? "bg-slate-900 text-white border-slate-900"
+                                        : "bg-white text-slate-500 border-slate-200 hover:border-slate-400"
+                                )}
+                            >
+                                {s === "all" ? "All" : STATUS_CONFIG[s as keyof typeof STATUS_CONFIG]?.label ?? s}
+                            </button>
+                        ))}
                     </div>
 
                     {/* Legend */}
-                    <div className="flex items-center gap-3 text-[10px] text-slate-500">
-                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500" /> Needs Action</div>
-                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500" /> Pending</div>
-                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500" /> Completed</div>
-                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full border border-orange-500 bg-orange-100" /> Mandatory</div>
+                    <div className="flex items-center gap-3 text-[10px] text-slate-500 flex-wrap">
+                        <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-red-500" /> Overdue
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-blue-500" /> Pending
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500" /> Completed
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Grid */}
+            {/* Calendar Grid */}
             <div className="flex-1 overflow-auto p-4">
+
                 {/* Week Header */}
                 <div className="grid grid-cols-7 mb-2">
                     {weekDays.map(d => (
@@ -126,20 +141,25 @@ export function CalendarGrid({ events, currentDate, onDateChange, onEventClick }
                 </div>
 
                 {/* Days Grid */}
-                <div className="grid grid-cols-7 gap-1 md:gap-2 auto-rows-fr h-full min-h-[500px]">
+                <div className="grid grid-cols-7 gap-1 md:gap-2 auto-rows-fr min-h-[500px]">
                     {days.map(day => {
                         const isCurrentMonth = isSameMonth(day, currentDate);
-                        const dayEvents = filteredEvents.filter(e => isSameDay(new Date(e.dueDate), day));
+                        const dayEvents = filteredEvents.filter(e =>
+                            isSameDay(new Date(e.deadlineDate), day)
+                        );
 
                         return (
                             <div
                                 key={day.toISOString()}
                                 className={cn(
-                                    "border rounded-md p-1 md:p-2 flex flex-col min-h-[80px] md:min-h-[100px] transition-colors relative",
-                                    !isCurrentMonth ? "bg-slate-50 text-slate-400 border-slate-100" : "bg-white border-slate-200 hover:border-blue-300",
+                                    "border rounded-md p-1 md:p-2 flex flex-col min-h-[80px] md:min-h-[100px] transition-colors",
+                                    !isCurrentMonth
+                                        ? "bg-slate-50 text-slate-400 border-slate-100"
+                                        : "bg-white border-slate-200 hover:border-blue-300",
                                     isToday(day) && "ring-1 ring-blue-500 bg-blue-50/10"
                                 )}
                             >
+                                {/* Day Number */}
                                 <div className="flex justify-between items-start mb-1">
                                     <span className={cn(
                                         "text-xs font-medium h-6 w-6 flex items-center justify-center rounded-full",
@@ -149,30 +169,32 @@ export function CalendarGrid({ events, currentDate, onDateChange, onEventClick }
                                     </span>
                                 </div>
 
+                                {/* Events */}
                                 <div className="flex-1 flex flex-col gap-1 overflow-hidden">
                                     {dayEvents.slice(0, 3).map(event => (
                                         <div
-                                            key={event.id}
+                                            key={event._id}
                                             onClick={(e) => { e.stopPropagation(); onEventClick(event); }}
                                             className={cn(
                                                 "text-[10px] px-1.5 py-0.5 rounded border truncate cursor-pointer font-medium flex items-center gap-1",
-                                                event.status === 'NEEDS_ACTION' ? "bg-red-50 border-red-100 text-red-700" :
-                                                    event.status === 'COMPLETED' ? "bg-emerald-50 border-emerald-100 text-emerald-700" :
-                                                        "bg-blue-50 border-blue-100 text-blue-700"
+                                                event.displayStatus === "overdue"
+                                                    ? "bg-red-50 border-red-100 text-red-700"
+                                                    : event.displayStatus === "completed"
+                                                        ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                                                        : "bg-blue-50 border-blue-100 text-blue-700"
                                             )}
                                         >
                                             <div className={cn(
                                                 "w-1 h-1 rounded-full shrink-0",
-                                                event.status === 'NEEDS_ACTION' ? "bg-red-500" :
-                                                    event.status === 'COMPLETED' ? "bg-emerald-500" : "bg-blue-500"
+                                                event.displayStatus === "overdue" ? "bg-red-500" :
+                                                    event.displayStatus === "completed" ? "bg-emerald-500" : "bg-blue-500"
                                             )} />
-                                            {event.isMandatory && !event.title.includes("(M)") && <span className="text-orange-600 font-bold">!</span>}
                                             {event.title}
                                         </div>
                                     ))}
                                     {dayEvents.length > 3 && (
                                         <div className="text-[9px] text-slate-400 pl-1">
-                                            + {dayEvents.length - 3} more
+                                            +{dayEvents.length - 3} more
                                         </div>
                                     )}
                                 </div>

@@ -45,8 +45,8 @@ export interface BookConsultationData {
 export const consultationService = {
     // Create Razorpay Order
     async createOrder(amount: number = 1000): Promise<{ orderId: string; amount: number; currency: string; keyId: string; message?: string }> {
-        const { data: response } = await api.post('/consultations/create-order', { amount });
-        return response;
+        const { data: response } = await api.post('/payments/create-order', { amount, entityType: 'CONSULTATION' });
+        return response as any;
     },
 
     // Verify Payment & Book
@@ -56,8 +56,11 @@ export const consultationService = {
         razorpay_signature: string;
         consultationData: BookConsultationData;
     }): Promise<{ consultation: Consultation; message: string }> {
-        const { data: response } = await api.post(`/consultations/verify-payment`, data);
-        return response;
+        const { data: response } = await api.post(`/payments/verify-payment`, {
+            ...data,
+            entityType: 'CONSULTATION'
+        });
+        return response as any;
     },
 
     // Refund Payment (Super Admin)
@@ -67,8 +70,8 @@ export const consultationService = {
     },
 
     // Get current user's consultations
-    async getMyConsultations(): Promise<{ consultations: Consultation[]; message: string }> {
-        const { data: response } = await api.get('/consultations');
+    async getMyConsultations(params?: { page?: number; limit?: number }): Promise<{ consultations: Consultation[]; pagination?: { totalCount: number; totalPages: number; currentPage: number; limit: number }; message: string }> {
+        const { data: response } = await api.get('/consultations', { params });
         return response;
     },
 

@@ -44,6 +44,7 @@ export function CreateComplianceDialog({ isOpen, onClose }: CreateComplianceDial
         dueDate: "",
         risk: "LOW",
         isMandatory: false,
+        price: "",
     });
 
     useEffect(() => {
@@ -65,7 +66,8 @@ export function CreateComplianceDialog({ isOpen, onClose }: CreateComplianceDial
                 department: template.department,
                 dueDate: dueDate.toISOString().split("T")[0],
                 risk: template.risk,
-                isMandatory: template.isMandatory
+                isMandatory: template.isMandatory,
+                price: ""
             });
         }
     };
@@ -80,6 +82,8 @@ export function CreateComplianceDialog({ isOpen, onClose }: CreateComplianceDial
         setLoading(true);
         try {
             await complianceService.createCompliance(formData);
+            // ✅ Sync across all modules (Calendar, Dashboard, etc.)
+            window.dispatchEvent(new CustomEvent('app:sync-data'));
             toast.success("Compliance assigned successfully");
             fetchCompliances(selectedCompany?._id, true);
             fetchStats(selectedCompany?._id, true);
@@ -223,6 +227,17 @@ export function CreateComplianceDialog({ isOpen, onClose }: CreateComplianceDial
                                 required
                             />
                         </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <Label className="text-xs">Price (₹)</Label>
+                        <Input 
+                            type="number"
+                            value={formData.price}
+                            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                            placeholder="0"
+                            min={0}
+                        />
                     </div>
 
                     <div className="flex items-center justify-between p-2 bg-slate-50 rounded border">

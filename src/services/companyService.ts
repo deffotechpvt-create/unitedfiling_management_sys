@@ -113,13 +113,24 @@ class CompanyService {
         return response.data;
     }
 
-    /**
-     * Update member role
-     * Access: SUPER_ADMIN, ADMIN
-     * Note: Cannot downgrade last OWNER
-     */
     async updateMemberRole(companyId: string, userId: string, data: UpdateMemberRoleData): Promise<{ company: Company; message: string }> {
         const response = await api.patch(`${this.baseUrl}/${companyId}/members/${userId}/role`, data);
+        return response.data;
+    }
+
+    /**
+     * Export companies to CSV
+     * Access: SUPER_ADMIN, ADMIN
+     */
+    async exportCompanies(filters?: CompanyFilters): Promise<Blob> {
+        const params = new URLSearchParams();
+        if (filters?.status) params.append('status', filters.status);
+        if (filters?.client) params.append('client', filters.client);
+        if (filters?.search) params.append('search', filters.search);
+
+        const response = await api.get(`${this.baseUrl}/export?${params.toString()}`, {
+            responseType: 'blob'
+        });
         return response.data;
     }
 }

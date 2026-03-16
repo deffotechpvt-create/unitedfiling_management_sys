@@ -93,92 +93,94 @@ export default function AdminManagementPage() {
                                     <p>No admins found. Create your first admin to get started.</p>
                                 </div>
                             ) : (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Name</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>Clients Assigned</TableHead>
-                                            <TableHead>Capacity</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {admins.map((admin) => (
-                                            <TableRow key={admin.id}>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-3">
-                                                        <Avatar className="h-8 w-8">
-                                                            <AvatarFallback>{admin.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                                                        </Avatar>
-                                                        <div className="flex flex-col">
-                                                            <span className="font-medium">{admin.name}</span>
-                                                            <span className="text-xs text-slate-500">{admin.email}</span>
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant={admin.status === "ACTIVE" ? "default" : "destructive"}>
-                                                        {admin.status}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="font-medium">{admin.clientsAssigned}</span>
-                                                    <span className="text-slate-500"> / {admin.maxClients}</span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="space-y-1">
-                                                        <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[120px]">
-                                                            <div
-                                                                className={`h-2.5 rounded-full ${admin.utilizationPercentage! >= 80
-                                                                    ? "bg-red-600"
-                                                                    : admin.utilizationPercentage! >= 50
-                                                                        ? "bg-yellow-600"
-                                                                        : "bg-green-600"
-                                                                    }`}
-                                                                style={{ width: `${admin.utilizationPercentage}%` }}
-                                                            ></div>
-                                                        </div>
-                                                        <span className="text-xs text-slate-500">{admin.utilizationPercentage}% utilized</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <RoleGuard allowedRoles={[ROLES.SUPER_ADMIN]}>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className={
-                                                                admin.status === "ACTIVE"
-                                                                    ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                                    : "text-green-600 hover:text-green-700 hover:bg-green-50"
-                                                            }
-                                                            onClick={() => handleToggleStatus(admin.id)}
-                                                        >
-                                                            {admin.status === "ACTIVE" ? (
-                                                                <>
-                                                                    <UserMinus className="mr-2 h-4 w-4" /> Revoke Access
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <UserCheck className="mr-2 h-4 w-4" /> Grant Access
-                                                                </>
-                                                            )}
-                                                        </Button>
-
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-2"
-                                                            onClick={() => handleDeleteAdmin(admin.id, admin.name)}
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </RoleGuard>
-                                                </TableCell>
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Name</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead>Clients Assigned</TableHead>
+                                                <TableHead>Capacity</TableHead>
+                                                <TableHead className="text-right">Actions</TableHead>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {admins.map((admin) => (
+                                                <TableRow key={admin.id}>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-3">
+                                                            <Avatar className="h-8 w-8">
+                                                                <AvatarFallback>{admin.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                                                            </Avatar>
+                                                            <div className="flex flex-col">
+                                                                <span className="font-medium">{admin.name}</span>
+                                                                <span className="text-xs text-slate-500">{admin.email}</span>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={admin.status === "ACTIVE" ? "default" : "destructive"}>
+                                                            {admin.status}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="font-medium">{admin.clientsAssigned}</span>
+                                                        <span className="text-slate-500"> / {admin.maxClients}</span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="space-y-1">
+                                                            <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[120px]">
+                                                                <div
+                                                                    className={`h-2.5 rounded-full ${admin.utilizationPercentage! >= 80
+                                                                        ? "bg-red-600"
+                                                                        : admin.utilizationPercentage! >= 50
+                                                                            ? "bg-yellow-600"
+                                                                            : "bg-green-600"
+                                                                        }`}
+                                                                    style={{ width: `${admin.utilizationPercentage}%` }}
+                                                                ></div>
+                                                            </div>
+                                                            <span className="text-xs text-slate-500">{admin.utilizationPercentage}% utilized</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <RoleGuard allowedRoles={[ROLES.SUPER_ADMIN]}>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className={
+                                                                    admin.status === "ACTIVE"
+                                                                        ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                        : "text-green-600 hover:text-green-700 hover:bg-green-50"
+                                                                }
+                                                                onClick={() => handleToggleStatus(admin.id)}
+                                                            >
+                                                                {admin.status === "ACTIVE" ? (
+                                                                    <>
+                                                                        <UserMinus className="mr-2 h-4 w-4" /> Revoke Access
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <UserCheck className="mr-2 h-4 w-4" /> Grant Access
+                                                                    </>
+                                                                )}
+                                                            </Button>
+    
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-2"
+                                                                onClick={() => handleDeleteAdmin(admin.id, admin.name)}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </RoleGuard>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
                             )}
                         </CardContent>
                     </Card>

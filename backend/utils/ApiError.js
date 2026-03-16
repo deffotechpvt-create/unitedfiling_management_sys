@@ -33,9 +33,9 @@ class ApiError extends Error {
     // Don't add errors property if empty
 
     // Capture stack trace (only in development)
-    if (process.env.NODE_ENV === 'development') {
-      Error.captureStackTrace(this, this.constructor);
-    }
+    // if (process.env.NODE_ENV === 'development') {
+    //   Error.captureStackTrace(this, this.constructor);
+    // }
   }
 }
 

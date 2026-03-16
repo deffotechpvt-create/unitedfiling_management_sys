@@ -71,7 +71,7 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
 
         try {
             setError(null);
-            setLoading(true);
+            if (clients.length === 0) setLoading(true);
 
             const response = await clientService.getAllClients(activeFilters);
 
@@ -186,9 +186,8 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
     const createClient = async (data: CreateClientData) => {
         try {
             setError(null);
-            setLoading(true);
             await clientService.createClient(data);
-            toast.success("Client created successfully");
+            toast.success("Client created");
             refreshAll(true);
         } catch (err: any) {
             const errorMessage = err.response?.data?.message || err.message || "Failed to create client";
@@ -203,18 +202,17 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
     const updateClient = async (clientId: string, data: UpdateClientData) => {
         try {
             setError(null);
-            setLoading(true);
-            const response = await clientService.updateClient(clientId, data);
-            toast.success("Client updated successfully");
+            const previousClients = [...clients];
+            setClients(prev => prev.map(c => c._id === clientId ? { ...c, ...data } as Client : c));
+
+            await clientService.updateClient(clientId, data);
+            toast.success("Client updated");
             refreshAll(true);
-            if (response.client) {
-                setSelectedClient(prev => prev?._id === clientId ? response.client : prev);
-            }
         } catch (err: any) {
-            const errorMessage = err.response?.data?.message || err.message || "Failed to update client";
-            setError(errorMessage);
-            toast.error(errorMessage);
-            throw new Error(errorMessage);
+            // rollback logic would go here if we had simple state, but refreshAll handles it
+            toast.error(err.response?.data?.message || err.message || "Failed to update client");
+            refreshAll(true);
+            throw err;
         } finally {
             setLoading(false);
         }
@@ -223,18 +221,16 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
     const deleteClient = async (clientId: string) => {
         try {
             setError(null);
-            setLoading(true);
+            setClients(prev => prev.filter(c => c._id !== clientId));
             await clientService.deleteClient(clientId);
-            toast.success("Client deleted successfully");
+            toast.success("Client deleted");
             refreshAll(true);
             if (selectedClient?._id === clientId) {
                 setSelectedClient(null);
             }
         } catch (err: any) {
-            const errorMessage = err.response?.data?.message || err.message || "Failed to delete client";
-            setError(errorMessage);
-            toast.error(errorMessage);
-            throw new Error(errorMessage);
+            toast.error(err.response?.data?.message || err.message || "Failed to delete client");
+            refreshAll(true);
         } finally {
             setLoading(false);
         }
@@ -243,15 +239,11 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
     const assignClientToAdmin = async (clientId: string, adminId: string) => {
         try {
             setError(null);
-            setLoading(true);
             await clientService.assignClientToAdmin(clientId, adminId);
-            toast.success("Client assigned successfully");
+            toast.success("Client assigned");
             refreshAll(true);
         } catch (err: any) {
-            const errorMessage = err.response?.data?.message || err.message || "Failed to assign client";
-            setError(errorMessage);
-            toast.error(errorMessage);
-            throw new Error(errorMessage);
+            toast.error(err.response?.data?.message || err.message || "Failed to assign client");
         } finally {
             setLoading(false);
         }
@@ -260,15 +252,11 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
     const unassignClient = async (clientId: string) => {
         try {
             setError(null);
-            setLoading(true);
             await clientService.unassignClient(clientId);
-            toast.success("Client unassigned successfully");
+            toast.success("Client unassigned");
             refreshAll(true);
         } catch (err: any) {
-            const errorMessage = err.response?.data?.message || err.message || "Failed to unassign client";
-            setError(errorMessage);
-            toast.error(errorMessage);
-            throw new Error(errorMessage);
+            toast.error(err.response?.data?.message || err.message || "Failed to unassign client");
         } finally {
             setLoading(false);
         }

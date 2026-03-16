@@ -33,7 +33,8 @@ import { toast } from "sonner";
 import { useCompany } from "@/context/company-context";
 import { useAuth } from "@/context/auth-context";
 import { Company, User } from "@/types";
-import { ROLES } from "@/lib/roles";
+import { ROLES, canDelete } from "@/lib/roles";
+import companyService from "@/services/companyService";
 
 interface ManageMembersDialogProps {
     isOpen: boolean;
@@ -62,8 +63,30 @@ export function ManageMembersDialog({
     const [selectedRole, setSelectedRole] = useState<"OWNER" | "EDITOR" | "VIEWER">("VIEWER");
     const [loading, setLoading] = useState(false);
     const [fetchingUsers, setFetchingUsers] = useState(false);
+    const [fetchingFullDetails, setFetchingFullDetails] = useState(false);
+    const [currentCompany, setCurrentCompany] = useState<Company>(company);
 
     const canManageMembers = user?.role === ROLES.SUPER_ADMIN || user?.role === ROLES.ADMIN;
+
+    // Load full details for members
+    useEffect(() => {
+        if (isOpen && company._id) {
+            fetchFullDetails();
+        }
+    }, [isOpen, company._id]);
+
+    const fetchFullDetails = async () => {
+        setFetchingFullDetails(true);
+        try {
+            const { company: fullCompany } = await companyService.getCompanyById(company._id);
+            setCurrentCompany(fullCompany);
+        } catch (error) {
+            console.error("Failed to load full company details", error);
+            toast.error("Failed to load members list");
+        } finally {
+            setFetchingFullDetails(false);
+        }
+    };
 
     // Load all users to allow adding (Only for Management)
     useEffect(() => {
@@ -100,7 +123,8 @@ export function ManageMembersDialog({
             if (success) {
                 toast.success("Member added successfully");
                 setSelectedUserId("");
-                onUpdate();
+                fetchFullDetails(); // Refresh local list
+                onUpdate(); // Refresh parent list (for memberCount)
                 // Optionally refresh users list if they are removed from addable list
                 fetchUsers();
             }
@@ -119,6 +143,7 @@ export function ManageMembersDialog({
             const success = await removeMember(company._id, userId);
             if (success) {
                 toast.success("Member removed successfully");
+                fetchFullDetails();
                 onUpdate();
                 fetchUsers();
             }
@@ -135,6 +160,7 @@ export function ManageMembersDialog({
             const success = await updateMemberRole(company._id, userId, role);
             if (success) {
                 toast.success("Role updated successfully");
+                fetchFullDetails();
                 onUpdate();
             }
         } catch (error: any) {
@@ -146,7 +172,7 @@ export function ManageMembersDialog({
 
     // Filter users that are not already members
     const availableUsers = allUsers.filter(
-        (u) => !company.members.some((m) => (typeof m.user === 'string' ? m.user === u._id : m.user._id === u._id))
+        (u) => !currentCompany.members?.some((m) => (typeof m.user === 'string' ? m.user === u._id : m.user._id === u._id))
     ).filter(u =>
         u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -158,7 +184,7 @@ export function ManageMembersDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Shield className="h-5 w-5 text-blue-600" />
-                        Manage Members: {company.name}
+                        Manage Members: {currentCompany.name}
                     </DialogTitle>
                     <DialogDescription>
                         Control who has access to this company and their permission levels.
@@ -246,14 +272,23 @@ export function ManageMembersDialog({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {company.members.length === 0 ? (
+                                {fetchingFullDetails ? (
+                                    <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-10">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                                                <span className="text-sm text-slate-500 font-medium">Loading members...</span>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : !currentCompany.members || currentCompany.members.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={3} className="text-center py-6 text-slate-500">
                                             No members assigned to this company.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    company.members.map((member: any) => {
+                                    currentCompany.members.map((member: any) => {
                                         const user = member.user;
                                         const userId = typeof user === 'string' ? user : user._id;
                                         const userName = typeof user === 'string' ? 'Unknown' : user.name;
@@ -306,7 +341,7 @@ export function ManageMembersDialog({
                                                         </Badge>
                                                     )}
                                                 </TableCell>
-                                                {canManageMembers && (
+                                                {canManageMembers && canDelete(user?.role) && (
                                                     <TableCell className="text-right">
                                                         <Button
                                                             variant="ghost"

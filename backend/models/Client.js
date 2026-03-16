@@ -94,7 +94,14 @@ ClientSchema.index({ assignedAdmin: 1, status: 1 }); // Compound for admin queri
  * Pre-save: Validate admin assignment capacity
  */
 ClientSchema.pre('save', async function (next) {
-  if (!this.isModified('assignedAdmin')) return next();
+  // If admin changed, remove from old admin
+  if (!this.isNew && this.isModified('assignedAdmin')) {
+    const User = mongoose.model('User');
+    await User.updateMany(
+      { managedClients: this._id },
+      { $pull: { managedClients: this._id } }
+    );
+  }
 
   // If assigning to an admin, check capacity
   if (this.assignedAdmin) {
@@ -119,7 +126,25 @@ ClientSchema.pre('save', async function (next) {
       return next(new Error(`Admin has reached maximum capacity of ${constants.MAX_CLIENTS_PER_ADMIN} clients`));
     }
   }
+  // Phone uniqueness check and sync with User model
+  if (this.isModified('phone') && this.phone) {
+    const User = mongoose.model('User');
+    
+    // 1. Check if phone is already used by another client
+    const existingClient = await this.constructor.findOne({ 
+      phone: this.phone, 
+      _id: { $ne: this._id } 
+    });
+    
+    if (existingClient) {
+      return next(new Error('Phone number already exists for another client'));
+    }
 
+    // 2. Automatically update phone in linked User document
+    if (this.userId) {
+      await User.findByIdAndUpdate(this.userId, { phone: this.phone });
+    }
+  }
   next();
 });
 
@@ -133,6 +158,60 @@ ClientSchema.post('save', async function (doc) {
       doc.assignedAdmin,
       { $addToSet: { managedClients: doc._id } }
     );
+  }
+});
+
+/**
+ * Handle Cleanup on Delete
+ * Ensures that whenever a client is deleted, it is removed from any admin's managedClients array.
+ */
+ClientSchema.pre('deleteOne', { document: true, query: false }, async function (next) {
+  try {
+    const User = mongoose.model('User');
+    const Company = mongoose.model('Company');
+    const Compliance = mongoose.model('Compliance');
+    const CalendarEvent = mongoose.model('CalendarEvent');
+
+    // 1. Remove from admin's managedClients
+    await User.updateMany(
+      { managedClients: this._id },
+      { $pull: { managedClients: this._id } }
+    );
+
+    // 2. Cascading Delete
+    await Company.deleteMany({ client: this._id });
+    await Compliance.deleteMany({ client: this._id });
+    await CalendarEvent.deleteMany({ client: this._id });
+
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+ClientSchema.pre('findOneAndDelete', async function (next) {
+  try {
+    const docToDelete = await this.model.findOne(this.getQuery());
+    if (docToDelete) {
+      const User = mongoose.model('User');
+      const Company = mongoose.model('Company');
+      const Compliance = mongoose.model('Compliance');
+      const CalendarEvent = mongoose.model('CalendarEvent');
+
+      // 1. Remove from admin's managedClients
+      await User.updateMany(
+        { managedClients: docToDelete._id },
+        { $pull: { managedClients: docToDelete._id } }
+      );
+
+      // 2. Cascading Delete
+      await Company.deleteMany({ client: docToDelete._id });
+      await Compliance.deleteMany({ client: docToDelete._id });
+      await CalendarEvent.deleteMany({ client: docToDelete._id });
+    }
+    next();
+  } catch (err) {
+    next(err);
   }
 });
 

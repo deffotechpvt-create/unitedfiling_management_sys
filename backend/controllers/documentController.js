@@ -1,6 +1,7 @@
 const Document = require('../models/Document');
 const Company = require('../models/Company');
 const Client = require('../models/Client');
+const Compliance = require('../models/Compliance');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
@@ -28,6 +29,14 @@ async function getAdminClientIds(adminId) {
 async function getUserClientId(userId) {
     const client = await Client.findOne({ userId }).select('_id');
     return client ? client._id : null;
+}
+
+/**
+ * Resolves authorized company IDs for the calling USER (member-based).
+ */
+async function getUserAuthorizedCompanyIds(userId) {
+    const myCompanies = await Company.find({ 'members.user': userId }).select('_id');
+    return myCompanies.map(c => c._id.toString());
 }
 
 /**
@@ -103,6 +112,11 @@ exports.uploadDocument = asyncHandler(async (req, res) => {
 
     // ── ROLE-BASED UPLOAD AUTHORIZATION ──────────────────────────────────────
     if (role === constants.ROLES.USER) {
+        // Enforce: USER can ONLY upload if it's linked to a compliance (per user request)
+        if (!relatedComplianceId) {
+            throw new ApiError(403, 'Users can only upload documents linked to a specific compliance record. Please use the compliance management page.');
+        }
+
         // USER must be a member of the target company
         if (finalCompany) {
             const isMember = finalCompany.isMember ? finalCompany.isMember(userId) :
@@ -122,6 +136,18 @@ exports.uploadDocument = asyncHandler(async (req, res) => {
                 throw new ApiError(403, 'You can only upload documents to your own client record');
             }
             finalClient = userClientId;
+        }
+
+        // Verify the compliance record exists and belongs to the user
+        const complianceCheck = await Compliance.findById(relatedComplianceId);
+        if (!complianceCheck) {
+            throw new ApiError(404, 'Linked compliance record not found');
+        }
+        
+        // Ensure the company of the compliance is one the user has access to
+        const userCompanies = await getUserAuthorizedCompanyIds(userId);
+        if (!userCompanies.includes(complianceCheck.company.toString())) {
+            throw new ApiError(403, 'You do not have access to this compliance record');
         }
     } else if (role === constants.ROLES.ADMIN) {
         // ADMIN can only upload to companies belonging to their assigned clients
@@ -175,6 +201,25 @@ exports.uploadDocument = asyncHandler(async (req, res) => {
 
     if (relatedComplianceId) {
         await document.linkToCompliance(relatedComplianceId);
+        
+        // Auto-progress compliance status/stage
+        const compliance = await Compliance.findById(relatedComplianceId);
+        if (compliance) {
+            let changed = false;
+            if (compliance.status === constants.COMPLIANCE_STATUS.PENDING || 
+                compliance.status === constants.COMPLIANCE_STATUS.WAITING_FOR_CLIENT ||
+                compliance.status === constants.COMPLIANCE_STATUS.NEEDS_ACTION) {
+                compliance.status = constants.COMPLIANCE_STATUS.IN_PROGRESS;
+                changed = true;
+            }
+            if (compliance.stage === constants.COMPLIANCE_STAGES.PAYMENT) {
+                compliance.stage = constants.COMPLIANCE_STAGES.DOCUMENTATION;
+                changed = true;
+            }
+            if (changed) {
+                await compliance.save();
+            }
+        }
     }
 
     res.status(201).json(new ApiResponse(201, {
@@ -263,13 +308,29 @@ exports.listDocuments = asyncHandler(async (req, res) => {
         query.folder = folder;
     }
 
-    const documents = await Document.find(query)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 0; // 0 means return all
+    const skip = (page - 1) * limit;
+
+    const totalCount = await Document.countDocuments(query);
+
+    let documentsQuery = Document.find(query)
         .populate('uploadedBy', 'name email')
         .populate('company', 'name')
+        .select('-publicId -__v')
         .sort({ createdAt: -1 });
+
+    if (limit > 0) {
+        documentsQuery = documentsQuery.skip(skip).limit(limit);
+    }
+
+    const documents = await documentsQuery;
 
     res.status(200).json(new ApiResponse(200, {
         documents,
+        count: totalCount,
+        totalPages: limit > 0 ? Math.ceil(totalCount / limit) : 1,
+        currentPage: page,
         message: 'Documents retrieved successfully'
     }));
 });
@@ -341,6 +402,19 @@ exports.deleteDocument = asyncHandler(async (req, res) => {
         }
     }
     // SUPER_ADMIN — no scope restriction
+
+    if (document.relatedCompliance) {
+        const Compliance = require('../models/Compliance');
+        const compliance = await Compliance.findById(document.relatedCompliance);
+        if (compliance && compliance.attachments) {
+            // Manual filter is safer for Mixed types and avoids Mongo operator errors
+            compliance.attachments = compliance.attachments.filter(att => {
+                const attUrl = typeof att === 'string' ? att : att?.url;
+                return attUrl !== document.url;
+            });
+            await compliance.save();
+        }
+    }
 
     // ── DELETE FROM CLOUDINARY + DB ───────────────────────────────────────────
     if (document.publicId) {

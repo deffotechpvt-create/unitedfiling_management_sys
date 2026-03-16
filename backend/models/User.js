@@ -18,6 +18,11 @@ const UserSchema = new mongoose.Schema({
         trim: true,
         match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email address'],
     },
+    phone: {
+        type: String,
+        trim: true,
+        match: [/^\d{10}$/, 'Please provide a valid 10-digit phone number'],
+    },
     password: {
         type: String,
         required: [true, 'Password is required'],
@@ -85,6 +90,68 @@ UserSchema.pre('save', async function (next) {
         next();
     } catch (error) {
         next(error);
+    }
+});
+
+/**
+ * Handle Cleanup on Delete
+ */
+UserSchema.pre('deleteOne', { document: true, query: false }, async function (next) {
+    try {
+        const Company = mongoose.model('Company');
+        const Client = mongoose.model('Client');
+        const Compliance = mongoose.model('Compliance');
+
+        // 1. Remove from all company memberships
+        await Company.updateMany(
+            { 'members.user': this._id },
+            { $pull: { members: { user: this._id } } }
+        );
+
+        // 2. Unassign from Clients
+        await Client.updateMany(
+            { assignedAdmin: this._id },
+            { $set: { assignedAdmin: null } }
+        );
+
+        // 3. Unassign from Compliances
+        await Compliance.updateMany(
+            { assignedTo: this._id },
+            { $set: { assignedTo: null, expertName: 'Unassigned' } }
+        );
+
+        next();
+    } catch (err) {
+        next(err);
+    }
+});
+
+UserSchema.pre('findOneAndDelete', async function (next) {
+    try {
+        const docToDelete = await this.model.findOne(this.getQuery());
+        if (docToDelete) {
+            const Company = mongoose.model('Company');
+            const Client = mongoose.model('Client');
+            const Compliance = mongoose.model('Compliance');
+
+            await Company.updateMany(
+                { 'members.user': docToDelete._id },
+                { $pull: { members: { user: docToDelete._id } } }
+            );
+
+            await Client.updateMany(
+                { assignedAdmin: docToDelete._id },
+                { $set: { assignedAdmin: null } }
+            );
+
+            await Compliance.updateMany(
+                { assignedTo: docToDelete._id },
+                { $set: { assignedTo: null, expertName: 'Unassigned' } }
+            );
+        }
+        next();
+    } catch (err) {
+        next(err);
     }
 });
 

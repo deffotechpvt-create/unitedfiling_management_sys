@@ -8,6 +8,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const mongoose = require('mongoose');
+const statusHelper = require('../utils/statusHelper');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCOPE HELPERS — reusable across controller functions
@@ -54,16 +55,29 @@ exports.getAllCompliances = asyncHandler(async (req, res) => {
     } else if (role === constants.ROLES.ADMIN) {
         const authorizedIds = await getAdminAuthorizedCompanyIds(userId);
 
+        // ADMIN sees strictly: 
+        // 1. Compliances explicitly assigned to them as Expert
+        // 2. Compliances they created
+        const scopeFilter = {
+            $or: [
+                { assignedTo: userId },
+                { createdBy: userId }
+            ]
+        };
+
         if (company) {
             if (!authorizedIds.includes(company)) {
-                // Company outside admin scope — return empty, not 403, to avoid info disclosure
-                return res.status(200).json(new ApiResponse(200, {
-                    compliances: [], count: 0, message: 'Compliances retrieved successfully'
-                }));
+                // If company is not theirs, still allow if they are assigned to a compliance in it
+                // We'll refine this to only that company
+                query.$and = [
+                    scopeFilter,
+                    { company: company }
+                ];
+            } else {
+                query.company = company;
             }
-            query.company = company;
         } else {
-            query.company = { $in: authorizedIds };
+            Object.assign(query, scopeFilter);
         }
     } else if (role === constants.ROLES.USER) {
         const authorizedIds = await getUserAuthorizedCompanyIds(userId);
@@ -104,17 +118,131 @@ exports.getAllCompliances = asyncHandler(async (req, res) => {
         ];
     }
 
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 0; // 0 means return all
+    const skip = (page - 1) * limit;
+
+    const totalCount = await Compliance.countDocuments(query);
+
+    let compliancesQuery = Compliance.find(query)
+        .populate('company', 'name')
+        .populate('client', 'name companyName')
+        .populate('assignedTo', 'name email')
+        .select('-notes -__v')
+        .sort({ dueDate: 1 });
+
+    if (limit > 0) {
+        compliancesQuery = compliancesQuery.skip(skip).limit(limit);
+    }
+
+    const compliances = await compliancesQuery;
+
+    res.status(200).json(new ApiResponse(200, {
+        compliances,
+        count: totalCount, // Total matched documents
+        totalPages: limit > 0 ? Math.ceil(totalCount / limit) : 1,
+        currentPage: page,
+        message: 'Compliances retrieved successfully'
+    }));
+});
+
+/**
+ * @desc    Export compliances to CSV
+ * @route   GET /api/compliances/export
+ * @access  Private (SUPER_ADMIN, ADMIN only)
+ */
+exports.exportCompliances = asyncHandler(async (req, res) => {
+    const { role, _id: userId } = req.user;
+    const { company, status, stage, department, category, search } = req.query;
+    let query = {};
+
+    // ── ROLE-BASED SCOPE ────────────────────────────────────
+    if (role === constants.ROLES.SUPER_ADMIN) {
+        if (company && mongoose.Types.ObjectId.isValid(company)) {
+            query.company = company;
+        }
+    } else if (role === constants.ROLES.ADMIN) {
+        const authorizedIds = await getAdminAuthorizedCompanyIds(userId);
+        const scopeFilter = {
+            $or: [
+                { assignedTo: userId },
+                { createdBy: userId }
+            ]
+        };
+
+        if (company) {
+            if (!authorizedIds.includes(company)) {
+                throw new ApiError(403, 'Unauthorized company export');
+            }
+            query.company = company;
+        } else {
+            Object.assign(query, scopeFilter);
+        }
+    } else {
+        throw new ApiError(403, 'Access denied');
+    }
+
+    if (status) query.status = status;
+    if (stage) query.stage = stage;
+    if (department) query.department = department;
+    if (category) query.category = Array.isArray(category) ? { $in: category } : category;
+    if (search) {
+        const searchRegex = new RegExp(search, 'i');
+        query.$or = [
+            { serviceType: searchRegex },
+            { category: searchRegex },
+            { department: searchRegex },
+            { expertName: searchRegex }
+        ];
+    }
+
     const compliances = await Compliance.find(query)
         .populate('company', 'name')
         .populate('client', 'name companyName')
         .populate('assignedTo', 'name email')
         .sort({ dueDate: 1 });
 
-    res.status(200).json(new ApiResponse(200, {
-        compliances,
-        count: compliances.length,
-        message: 'Compliances retrieved successfully'
-    }));
+    // Generate CSV
+    const headers = [
+        'Compliance Name',
+        'Company',
+        'Client',
+        'Expert Name',
+        'Due Date',
+        'Stage',
+        'Status',
+        'Department',
+        'Category',
+        'Mandatory',
+        'Risk',
+        'Price',
+        'Notes'
+    ];
+
+    const rows = compliances.map(c => [
+        `"${c.serviceType || ''}"`,
+        `"${c.company?.name || ''}"`,
+        `"${c.client?.name || ''}"`,
+        `"${c.expertName || 'Unassigned'}"`,
+        `"${c.dueDate ? new Date(c.dueDate).toLocaleDateString('en-GB') : ''}"`,
+        `"${c.stage || ''}"`,
+        `"${c.status || ''}"`,
+        `"${c.department || ''}"`,
+        `"${c.category || ''}"`,
+        `"${c.isMandatory ? 'Yes' : 'No'}"`,
+        `"${c.risk || ''}"`,
+        `"${c.price || 0}"`,
+        `"${(c.notes || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment('compliances.csv');
+    return res.send(csvContent);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -136,6 +264,12 @@ exports.getComplianceStats = asyncHandler(async (req, res) => {
         }
     } else if (role === constants.ROLES.ADMIN) {
         const authorizedIds = await getAdminAuthorizedCompanyIds(userId);
+        const scopeFilter = {
+            $or: [
+                { assignedTo: userId },
+                { createdBy: userId }
+            ]
+        };
 
         if (company) {
             if (!authorizedIds.includes(company)) {
@@ -144,9 +278,15 @@ exports.getComplianceStats = asyncHandler(async (req, res) => {
                     message: 'Compliance statistics retrieved successfully'
                 }));
             }
-            query.company = new mongoose.Types.ObjectId(company);
+            query.$and = [
+                { company: new mongoose.Types.ObjectId(company) },
+                scopeFilter
+            ];
         } else {
-            query.company = { $in: authorizedIds.map(id => new mongoose.Types.ObjectId(id)) };
+            query.$and = [
+                { company: { $in: authorizedIds.map(id => new mongoose.Types.ObjectId(id)) } },
+                scopeFilter
+            ];
         }
     } else if (role === constants.ROLES.USER) {
         const authorizedIds = await getUserAuthorizedCompanyIds(userId);
@@ -272,7 +412,7 @@ exports.getComplianceStats = asyncHandler(async (req, res) => {
  */
 exports.updateCompliance = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { status, stage, assignedTo, expertName, category, department, serviceType } = req.body;
+    const { status, stage, assignedTo, expertName, category, department, serviceType, price } = req.body;
     const { role, _id: userId } = req.user;
 
     // ── ROLE GUARD (defence-in-depth — route already blocks USER via checkRole) ─
@@ -295,23 +435,36 @@ exports.updateCompliance = asyncHandler(async (req, res) => {
         if (!authorizedIds.includes(compliance.company._id.toString())) {
             throw new ApiError(403, 'You do not have permission to update this compliance. It belongs to a company outside your assigned clients.');
         }
+
+        // Strictly check for Expert or Creator responsibility
+        const isAssignee = compliance.assignedTo?.toString() === userId.toString();
+        const isCreator = compliance.createdBy?.toString() === userId.toString();
+        if (!isAssignee && !isCreator) {
+            throw new ApiError(403, 'Unauthorized: This task is assigned to another admin.');
+        }
     }
 
-    // ── STATUS UPDATE ─────────────────────────────────────────────────────────
-    // Only allow valid statuses from constants (prevents arbitrary status injection)
+    // ── STATUS UPDATE (Enforce Forward-Only if PAID) ──────────────────────────
     if (status !== undefined) {
         if (!Object.values(constants.COMPLIANCE_STATUS).includes(status)) {
             throw new ApiError(400, `Invalid status. Allowed values: ${Object.values(constants.COMPLIANCE_STATUS).join(', ')}`);
         }
+
+        // Security: Forward-only logic
+        statusHelper.checkTransition(compliance.status, status, 'status');
+
         compliance.status = status;
-        // completedDate is managed by the model's pre-save hook automatically
     }
 
-    // ── STAGE UPDATE ──────────────────────────────────────────────────────────
+    // ── STAGE UPDATE (Enforce Forward-Only if PAID) ───────────────────────────
     if (stage !== undefined) {
         if (!Object.values(constants.COMPLIANCE_STAGES).includes(stage)) {
             throw new ApiError(400, `Invalid stage. Allowed values: ${Object.values(constants.COMPLIANCE_STAGES).join(', ')}`);
         }
+
+        // Security: Forward-only logic
+        statusHelper.checkTransition(compliance.stage, stage, 'stage');
+
         compliance.stage = stage;
     }
 
@@ -347,6 +500,7 @@ exports.updateCompliance = asyncHandler(async (req, res) => {
     if (category !== undefined) compliance.category = category;
     if (department !== undefined && Object.values(constants.DEPARTMENTS).includes(department)) compliance.department = department;
     if (serviceType !== undefined) compliance.serviceType = serviceType;
+    if (price !== undefined) compliance.price = Number(price);
 
     compliance.updatedBy = userId;
     await compliance.save();
@@ -354,7 +508,8 @@ exports.updateCompliance = asyncHandler(async (req, res) => {
     const updated = await Compliance.findById(id)
         .populate('company', 'name')
         .populate('client', 'name companyName')
-        .populate('assignedTo', 'name email role');
+        .populate('assignedTo', 'name email role')
+        .select('-payment -__v');
 
     res.status(200).json(new ApiResponse(200, {
         compliance: updated,
@@ -370,7 +525,7 @@ exports.updateCompliance = asyncHandler(async (req, res) => {
  * @access  Private (SUPER_ADMIN, ADMIN only — enforced at route AND controller)
  */
 exports.createCompliance = asyncHandler(async (req, res) => {
-    const { companyId, serviceType, department, category, dueDate, risk, isMandatory } = req.body;
+    const { companyId, serviceType, department, category, dueDate, risk, isMandatory, price } = req.body;
     const { role, _id: userId } = req.user;
 
     // Defence-in-depth: USER is blocked at route by checkRole, but verify here too
@@ -404,7 +559,7 @@ exports.createCompliance = asyncHandler(async (req, res) => {
         }
     }
 
-    const compliance = await Compliance.create({
+    const complianceData = {
         company: company._id,
         client: company.client._id || company.client,
         serviceType: serviceType.trim(),
@@ -417,18 +572,31 @@ exports.createCompliance = asyncHandler(async (req, res) => {
             ? risk
             : constants.RISK_LEVELS.LOW,
         isMandatory: isMandatory !== undefined ? Boolean(isMandatory) : false,
+        price: price !== undefined ? Number(price) : 0,
         createdBy: userId,
         status: constants.COMPLIANCE_STATUS.PENDING,
         stage: constants.COMPLIANCE_STAGES.PAYMENT,
-    });
+    };
+
+    // ✅ If the creator is an ADMIN, automatically assign it to themselves (Expert)
+    if (role === constants.ROLES.ADMIN) {
+        complianceData.assignedTo = userId;
+        complianceData.expertName = req.user.name;
+    }
+
+    const compliance = await Compliance.create(complianceData);
 
     const populated = await Compliance.findById(compliance._id)
         .populate('company', 'name')
-        .populate('client', 'name companyName');
+        .populate('client', 'name companyName')
+        .populate('assignedTo', 'name email')
+        .select('-payment -__v');
 
     res.status(201).json(new ApiResponse(201, {
         compliance: populated,
-        message: 'Compliance assigned successfully'
+        message: role === constants.ROLES.ADMIN
+            ? 'Compliance created and automatically assigned to you.'
+            : 'Compliance assigned successfully'
     }));
 });
 
@@ -562,6 +730,7 @@ exports.deleteTemplate = asyncHandler(async (req, res) => {
  */
 exports.getTemplates = asyncHandler(async (req, res) => {
     const templates = await ComplianceTemplate.find().sort({ serviceType: 1 });
+
     res.status(200).json(new ApiResponse(200, {
         templates,
         message: 'Templates retrieved successfully'
@@ -580,7 +749,7 @@ exports.getTemplates = asyncHandler(async (req, res) => {
  */
 exports.addAttachment = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { url, note } = req.body;
+    const { url, name, note } = req.body;
     const { role, _id: userId } = req.user;
 
     if (!url && !note) {
@@ -620,12 +789,24 @@ exports.addAttachment = asyncHandler(async (req, res) => {
         if (!client.assignedAdmin || client.assignedAdmin.toString() !== userId.toString()) {
             throw new ApiError(403, 'You do not have access to this compliance');
         }
+
+        // Strictly check for Expert or Creator responsibility
+        const isAssignee = compliance.assignedTo?.toString() === userId.toString();
+        const isCreator = compliance.createdBy?.toString() === userId.toString();
+        if (!isAssignee && !isCreator) {
+            throw new ApiError(403, 'Unauthorized access to another admin\'s task');
+        }
     }
     // SUPER_ADMIN — full access, no additional check needed
 
     // ── MUTATION ─────────────────────────────────────────────────────────────
     if (url) {
-        compliance.attachments.push(url);
+        // If name is provided, store as object; else store as url string (fallback)
+        if (name) {
+            compliance.attachments.push({ name, url });
+        } else {
+            compliance.attachments.push(url);
+        }
     }
     if (note) {
         const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
@@ -636,6 +817,20 @@ exports.addAttachment = asyncHandler(async (req, res) => {
     }
 
     compliance.updatedBy = userId;
+    
+    // Auto-progress status/stage if a document is uploaded
+    if (url) {
+        const nextStatus = constants.COMPLIANCE_STATUS.IN_PROGRESS;
+        const nextStage = constants.COMPLIANCE_STAGES.DOCUMENTATION;
+
+        if (statusHelper.STATUS_RANK[nextStatus] > statusHelper.STATUS_RANK[compliance.status]) {
+            compliance.status = nextStatus;
+        }
+        if (statusHelper.STAGE_RANK[nextStage] > statusHelper.STAGE_RANK[compliance.stage]) {
+            compliance.stage = nextStage;
+        }
+    }
+
     await compliance.save();
 
     const updated = await Compliance.findById(id)
@@ -667,7 +862,15 @@ exports.bulkDeleteCompliances = asyncHandler(async (req, res) => {
     // ── ROLE-BASED SCOPE ──────────────────────────────────────────────────────
     if (role === constants.ROLES.ADMIN) {
         const authorizedIds = await getAdminAuthorizedCompanyIds(userId);
-        filter.company = { $in: authorizedIds };
+        filter.$and = [
+            { company: { $in: authorizedIds } },
+            {
+                $or: [
+                    { assignedTo: userId },
+                    { createdBy: userId }
+                ]
+            }
+        ];
     } else if (role !== constants.ROLES.SUPER_ADMIN) {
         throw new ApiError(403, 'You do not have permission to delete compliances');
     }

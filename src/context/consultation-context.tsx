@@ -13,6 +13,8 @@ interface ConsultationContextType {
     admins: { _id: string; name: string }[];
     loading: boolean;
     error: string | null;
+    pagination: { page: number; limit: number; totalPages: number; totalCount: number };
+    setPage: (page: number) => void;
     fetchMyConsultations: (force?: boolean) => Promise<void>;
     fetchConsultationById: (id: string, force?: boolean) => Promise<void>;
     fetchAdminsForAssignment: (force?: boolean) => Promise<void>;
@@ -37,6 +39,11 @@ export function ConsultationProvider({ children }: { children: React.ReactNode }
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { user, isAuthenticated } = useAuth();
+    const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1, totalCount: 0 });
+
+    const setPage = (page: number) => {
+        setPagination(prev => ({ ...prev, page }));
+    };
     
     const lastFetchTime = useRef<{ consultations: number; admins: number }>({ consultations: 0, admins: 0 });
     const isFetching = useRef<{ consultations: boolean; admins: boolean }>({ consultations: false, admins: false });
@@ -50,11 +57,21 @@ export function ConsultationProvider({ children }: { children: React.ReactNode }
         if (isFetching.current.consultations) return;
         isFetching.current.consultations = true;
 
-        setLoading(true);
+        if (consultations.length === 0) setLoading(true);
         setError(null);
         try {
-            const response = await consultationService.getMyConsultations();
+            const response = await consultationService.getMyConsultations({ 
+                page: pagination.page, 
+                limit: pagination.limit 
+            });
             setConsultations(response.consultations);
+            if (response.pagination) {
+                setPagination(prev => ({
+                    ...prev,
+                    totalPages: response.pagination!.totalPages,
+                    totalCount: response.pagination!.totalCount
+                }));
+            }
             lastFetchTime.current.consultations = Date.now();
         } catch (err: any) {
             const msg = err.response?.data?.message || "Failed to fetch consultations";
@@ -135,6 +152,8 @@ export function ConsultationProvider({ children }: { children: React.ReactNode }
                 ...paymentData,
                 consultationData
             });
+            // ✅ Sync across all modules
+            window.dispatchEvent(new CustomEvent('app:sync-data'));
             toast.success("Consultation booked & payment successful!");
             fetchMyConsultations(true);
             return true;
@@ -174,23 +193,35 @@ export function ConsultationProvider({ children }: { children: React.ReactNode }
     };
 
     const assignExpert = async (id: string, expertId: string) => {
+        const previousConsultations = [...consultations];
+        const expert = admins.find(a => a._id === expertId);
+        
+        setConsultations(prev => prev.map(c => 
+            c._id === id ? { ...c, assignedExpert: expertId, expertName: expert?.name } as any : c
+        ));
+
         try {
             await consultationService.assignExpert(id, expertId);
-            toast.success("Expert assigned successfully");
+            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            toast.success("Expert assigned");
             fetchMyConsultations(true);
-            if (currentConsultation?._id === id) fetchConsultationById(id, true);
         } catch (err: any) {
+            setConsultations(previousConsultations);
             toast.error("Failed to assign expert");
         }
     };
 
     const updateConsultationStatus = async (id: string, status: string) => {
+        const previousConsultations = [...consultations];
+        setConsultations(prev => prev.map(c => c._id === id ? { ...c, status } as any : c));
+
         try {
             await consultationService.updateStatus(id, status);
+            window.dispatchEvent(new CustomEvent('app:sync-data'));
             toast.success("Status updated");
             fetchMyConsultations(true);
-            if (currentConsultation?._id === id) fetchConsultationById(id, true);
         } catch (err: any) {
+            setConsultations(previousConsultations);
             toast.error("Failed to update status");
         }
     };
@@ -213,7 +244,18 @@ export function ConsultationProvider({ children }: { children: React.ReactNode }
         }
 
         refreshAll(false);
-    }, [user?._id, isAuthenticated, refreshAll]);
+    }, [user?._id, isAuthenticated, refreshAll, pagination.page]);
+
+    // ✅ Listen for sync signals from other modules
+    useEffect(() => {
+        const handleSync = () => {
+            if (!isAuthenticated) return;
+            console.log("[Consultation] 🔄 Syncing data from broadcast...");
+            refreshAll(true);
+        };
+        window.addEventListener('app:sync-data', handleSync);
+        return () => window.removeEventListener('app:sync-data', handleSync);
+    }, [isAuthenticated, refreshAll]);
 
     return (
         <ConsultationContext.Provider
@@ -233,7 +275,9 @@ export function ConsultationProvider({ children }: { children: React.ReactNode }
                 assignExpert,
                 updateConsultationStatus,
                 setCurrentConsultation,
-                refreshAll
+                refreshAll,
+                pagination,
+                setPage
             }}
         >
             {children}

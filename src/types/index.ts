@@ -143,6 +143,7 @@ export interface Company {
   industry?: string;
   memberCount?: number;
   fullAddress?: string;
+  myRole?: 'OWNER' | 'EDITOR' | 'VIEWER';
 }
 
 export interface CompanyStats {
@@ -188,4 +189,70 @@ export interface AddMemberData {
 
 export interface UpdateMemberRoleData {
   role: 'OWNER' | 'EDITOR' | 'VIEWER';
+}
+
+// ========================================
+// Calendar / Compliance Calendar Types
+// ========================================
+
+export type CalendarEventStatus =
+  | 'pending'
+  | 'needs_action'
+  | 'in_progress'
+  | 'waiting_for_client'
+  | 'completed'
+  | 'delayed'
+  | 'overdue';
+
+export type CalendarServiceType =
+  | 'GST'
+  | 'TDS'
+  | 'INCOME_TAX'
+  | 'ROC'
+  | 'PROFESSIONAL_TAX'
+  | 'ACCOUNTS';
+
+export interface CalendarEvent {
+  _id: string;
+  client: string | { _id: string; name: string; companyName: string };
+  company: string | { _id: string; name: string };
+  compliance?: string | null;
+  serviceType: CalendarServiceType;
+  title: string;
+  department: string;
+  frequency: 'Monthly' | 'Quarterly' | 'Annual' | 'One-time';
+  deadlineDate: string; // ISO format
+  completedDate?: string | null;
+  status: CalendarEventStatus;
+  displayStatus: 'pending' | 'completed' | 'overdue'; // Categorized status for tabs
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Virtuals from backend
+  daysRemaining?: number;
+  isOverdue?: boolean;
+}
+
+export interface CalendarApiResponse {
+  success: boolean;
+  message: string;
+  count: number;
+  events: CalendarEvent[];
+}
+
+export interface CalendarContextType {
+  events: CalendarEvent[];
+  upcomingEvents: CalendarEvent[];
+  loading: boolean;
+  error: string | null;
+  fetchEvents: (filters?: CalendarFilters & { clientId?: string }) => Promise<void>;
+  fetchUpcoming: (days?: number) => Promise<void>;
+  updateEventStatus: (id: string, status: CalendarEventStatus) => Promise<void>;
+}
+
+
+export interface CalendarFilters {
+  status?: CalendarEventStatus;
+  serviceType?: CalendarServiceType;
+  year?: number;
 }

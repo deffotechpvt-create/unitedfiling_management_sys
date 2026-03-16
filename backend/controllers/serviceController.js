@@ -9,7 +9,7 @@ const ApiError = require('../utils/ApiError');
  * @access  Public
  */
 exports.getAllServices = asyncHandler(async (req, res) => {
-    const services = await Service.find();
+    const services = await Service.find().select('-__v');
 
     res.status(200).json(
         new ApiResponse(200, {
@@ -26,7 +26,7 @@ exports.getAllServices = asyncHandler(async (req, res) => {
  * @access  Public
  */
 exports.getServiceById = asyncHandler(async (req, res) => {
-    const service = await Service.findById(req.params.id);
+    const service = await Service.findById(req.params.id).select('-__v');
 
     if (!service) {
         throw new ApiError(404, 'Service not found');

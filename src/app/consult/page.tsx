@@ -56,7 +56,7 @@ export default function ConsultPage() {
         setCurrentConsultation
     } = useConsultation();
     const { user, updateOnboardingTask } = useAuth();
-    
+
     useEffect(() => {
         if (user?.onboardingTasks && !user.onboardingTasks.consultExpert) {
             updateOnboardingTask('consultExpert');
@@ -95,7 +95,7 @@ export default function ConsultPage() {
 
     const handlePaymentClick = async () => {
         const orderData = await createPaymentOrder(1000);
-        
+
         if (!orderData) return;
 
         const formData = {
@@ -300,16 +300,16 @@ export default function ConsultPage() {
                                                         )}
                                                         <span className="text-xs text-slate-400">ID: {consult.payment.paymentId}</span>
                                                     </div>
-                                                    
+
                                                     {user?.role === 'SUPER_ADMIN' && consult.payment.status === 'PAID' && (
-                                                        <Button 
+                                                        <Button
                                                             onClick={async (e) => {
                                                                 e.stopPropagation();
                                                                 setConsultationToRefund(consult);
                                                                 setIsRefundDialogOpen(true);
                                                             }}
-                                                            size="sm" 
-                                                            variant="destructive" 
+                                                            size="sm"
+                                                            variant="destructive"
                                                             className="h-7 text-xs w-fit"
                                                         >
                                                             Refund ₹1,000
@@ -568,7 +568,7 @@ export default function ConsultPage() {
                         </div>
                         <div className="p-8 space-y-6">
                             <p className="text-slate-500">Your payment of ₹{successData?.amount.toLocaleString()} was successful and your consultation has been confirmed.</p>
-                            
+
                             <div className="bg-slate-50 rounded-lg p-6 max-w-sm mx-auto space-y-3 text-left border">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-slate-500">Payment ID:</span>
@@ -585,12 +585,12 @@ export default function ConsultPage() {
                             </div>
 
                             <p className="text-sm text-slate-600 font-medium">Our expert will contact you soon.</p>
-                            
-                            <Button 
+
+                            <Button
                                 onClick={() => {
                                     setView('LIST');
                                     setSuccessData(null);
-                                }} 
+                                }}
                                 className="bg-[#002A52] hover:bg-[#001f3f] w-full max-w-xs"
                             >
                                 View My Consultations
@@ -620,142 +620,142 @@ export default function ConsultPage() {
                         </div>
                     ) : (
                         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                        {/* Status Header */}
-                        <div className="p-6 border-b border-slate-100 flex items-start justify-between">
-                            <div className="flex gap-4">
-                                <Avatar className="h-12 w-12 border border-slate-100 bg-slate-50">
-                                    <AvatarFallback>
-                                        {currentConsultation?.assignedExpert?.name?.charAt(0) || <User className="h-6 w-6 text-slate-400" />}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                    <h2 className="text-lg font-bold text-slate-900">{currentConsultation?.type === 'CA' ? 'Chartered Accountant Consultation' : 'Legal Consultant Consultation'}</h2>
-                                    <p className="text-sm text-slate-500">
-                                        {currentConsultation?.ticketNumber ? (
-                                            <>Ticket no <span className="text-slate-900 font-medium">#{currentConsultation?.ticketNumber}</span></>
-                                        ) : (
-                                            <span className="animate-pulse italic">Loading ticket details...</span>
-                                        )}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {superAdmin && currentConsultation && (
-                                    <Select
-                                        value={(typeof currentConsultation.assignedExpert === "object" ? currentConsultation.assignedExpert?._id : currentConsultation.assignedExpert) || "unassigned"}
-                                        onValueChange={(val) => val && val !== "unassigned" && assignExpert(currentConsultation._id, val)}
-                                    >
-                                        <SelectTrigger className="h-8 w-[140px] text-xs">
-                                            <SelectValue placeholder="Assign expert" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="unassigned">Unassigned</SelectItem>
-                                            {admins.map((a) => (
-                                                <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                                {isAdmin && currentConsultation && (
-                                    <Select
-                                        value={currentConsultation.status}
-                                        onValueChange={(val) => updateConsultationStatus(currentConsultation._id, val)}
-                                    >
-                                        <SelectTrigger className="h-8 w-[130px] text-xs">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="PENDING">Pending</SelectItem>
-                                            <SelectItem value="CONFIRMED">Confirmed</SelectItem>
-                                            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                                            <SelectItem value="COMPLETED">Completed</SelectItem>
-                                            <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                                {!isAdmin && (
-                                    <Button variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50 text-xs h-auto py-1">
-                                        <span className="mr-2">⚠</span> Report an issue
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="p-6 space-y-8">
-                            {/* Messages Banner */}
-                            <div
-                                onClick={() => setShowMessages(true)}
-                                className="bg-[#fcf6ee] border border-[#f5e6d3] rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-[#faefe0] transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-[#e8dccb] p-2 rounded-full">
-                                        <div className="w-4 h-4 flex items-center justify-center">💬</div>
+                            {/* Status Header */}
+                            <div className="p-6 border-b border-slate-100 flex items-start justify-between">
+                                <div className="flex gap-4">
+                                    <Avatar className="h-12 w-12 border border-slate-100 bg-slate-50">
+                                        <AvatarFallback>
+                                            {currentConsultation?.assignedExpert?.name?.charAt(0) || <User className="h-6 w-6 text-slate-400" />}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                        <h2 className="text-lg font-bold text-slate-900">{currentConsultation?.type === 'CA' ? 'Chartered Accountant Consultation' : 'Legal Consultant Consultation'}</h2>
+                                        <p className="text-sm text-slate-500">
+                                            {currentConsultation?.ticketNumber ? (
+                                                <>Ticket no <span className="text-slate-900 font-medium">#{currentConsultation?.ticketNumber}</span></>
+                                            ) : (
+                                                <span className="animate-pulse italic">Loading ticket details...</span>
+                                            )}
+                                        </p>
                                     </div>
-                                    <span className="font-semibold text-[#5a4631]">Messages ({currentConsultation?.messages.length || 0})</span>
                                 </div>
-                                <ChevronRight className="h-5 w-5 text-[#5a4631]" />
+                                <div className="flex items-center gap-2">
+                                    {superAdmin && currentConsultation && (
+                                        <Select
+                                            value={(typeof currentConsultation.assignedExpert === "object" ? currentConsultation.assignedExpert?._id : currentConsultation.assignedExpert) || "unassigned"}
+                                            onValueChange={(val) => val && val !== "unassigned" && assignExpert(currentConsultation._id, val)}
+                                        >
+                                            <SelectTrigger className="h-8 w-[140px] text-xs">
+                                                <SelectValue placeholder="Assign expert" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="unassigned">Unassigned</SelectItem>
+                                                {admins.map((a) => (
+                                                    <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                    {isAdmin && currentConsultation && (
+                                        <Select
+                                            value={currentConsultation.status}
+                                            onValueChange={(val) => updateConsultationStatus(currentConsultation._id, val)}
+                                        >
+                                            <SelectTrigger className="h-8 w-[130px] text-xs">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="PENDING">Pending</SelectItem>
+                                                <SelectItem value="CONFIRMED">Confirmed</SelectItem>
+                                                <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                                                <SelectItem value="COMPLETED">Completed</SelectItem>
+                                                <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                    {!isAdmin && (
+                                        <Button variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50 text-xs h-auto py-1">
+                                            <span className="mr-2">⚠</span> Report an issue
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
 
-                            {/* Track Process */}
-                            <div className="space-y-6">
-                                <h3 className="font-bold text-slate-900 text-lg">Track process</h3>
-
-                                <div className="space-y-0 relative pl-2">
-                                    {/* Vertical Line */}
-                                    <div className="absolute left-[7px] top-2 bottom-6 w-[2px] bg-slate-200"></div>
-
-                                    {/* Step 1: Payment */}
-                                    <div className="relative pl-8 pb-8">
-                                        <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-4 ${currentConsultation?.payment?.status !== 'PAID' ? 'border-orange-500' : 'border-green-500'} bg-white z-10 flex items-center justify-center`}>
-                                            <div className={`w-1.5 h-1.5 ${currentConsultation?.payment?.status !== 'PAID' ? 'bg-orange-500' : 'bg-green-500'} rounded-full`} />
+                            <div className="p-6 space-y-8">
+                                {/* Messages Banner */}
+                                <div
+                                    onClick={() => setShowMessages(true)}
+                                    className="bg-[#fcf6ee] border border-[#f5e6d3] rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-[#faefe0] transition-colors"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-[#e8dccb] p-2 rounded-full">
+                                            <div className="w-4 h-4 flex items-center justify-center">💬</div>
                                         </div>
-                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-5 space-y-4">
-                                            <div className="flex justify-between items-center">
-                                                <h4 className="font-semibold text-slate-700">Payment</h4>
-                                                <span className={`${currentConsultation?.payment?.status !== 'PAID' ? 'bg-orange-500' : 'bg-green-500'} text-white text-[10px] font-bold px-2 py-0.5 rounded`}>
-                                                    {currentConsultation?.payment?.status !== 'PAID' ? 'Pending' : 'Completed'}
-                                                </span>
+                                        <span className="font-semibold text-[#5a4631]">Messages ({currentConsultation?.messages.length || 0})</span>
+                                    </div>
+                                    <ChevronRight className="h-5 w-5 text-[#5a4631]" />
+                                </div>
+
+                                {/* Track Process */}
+                                <div className="space-y-6">
+                                    <h3 className="font-bold text-slate-900 text-lg">Track process</h3>
+
+                                    <div className="space-y-0 relative pl-2">
+                                        {/* Vertical Line */}
+                                        <div className="absolute left-[7px] top-2 bottom-6 w-[2px] bg-slate-200"></div>
+
+                                        {/* Step 1: Payment */}
+                                        <div className="relative pl-8 pb-8">
+                                            <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-4 ${currentConsultation?.payment?.status !== 'PAID' ? 'border-orange-500' : 'border-green-500'} bg-white z-10 flex items-center justify-center`}>
+                                                <div className={`w-1.5 h-1.5 ${currentConsultation?.payment?.status !== 'PAID' ? 'bg-orange-500' : 'bg-green-500'} rounded-full`} />
                                             </div>
-                                            <p className="text-sm text-slate-500">
-                                                {currentConsultation?.payment?.status !== 'PAID'
-                                                    ? "Your payment is pending for this consultation. Click 'Pay now' to proceed further."
-                                                    : "Payment received. Your consultation is confirmed."}
-                                            </p>
-                                            {currentConsultation?.payment?.status !== 'PAID' && (
-                                                <Button className="w-full bg-[#001f3f] hover:bg-[#001f3f]/90 text-white">
-                                                    Pay now <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
-                                                </Button>
+                                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-5 space-y-4">
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className="font-semibold text-slate-700">Payment</h4>
+                                                    <span className={`${currentConsultation?.payment?.status !== 'PAID' ? 'bg-orange-500' : 'bg-green-500'} text-white text-[10px] font-bold px-2 py-0.5 rounded`}>
+                                                        {currentConsultation?.payment?.status !== 'PAID' ? 'Pending' : 'Completed'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-slate-500">
+                                                    {currentConsultation?.payment?.status !== 'PAID'
+                                                        ? "Your payment is pending for this consultation. Click 'Pay now' to proceed further."
+                                                        : "Payment received. Your consultation is confirmed."}
+                                                </p>
+                                                {currentConsultation?.payment?.status !== 'PAID' && (
+                                                    <Button className="w-full bg-[#001f3f] hover:bg-[#001f3f]/90 text-white">
+                                                        Pay now <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Step 2: Consultation Scheduled */}
+                                        <div className="relative pl-8 pb-8">
+                                            <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-2 ${['CONFIRMED', 'IN_PROGRESS', 'COMPLETED'].includes(currentConsultation?.status || '') ? 'border-green-500 bg-green-500' : 'border-slate-300 bg-white'} z-10 flex items-center justify-center`}>
+                                                {['CONFIRMED', 'IN_PROGRESS', 'COMPLETED'].includes(currentConsultation?.status || '') && <CheckCircle2 className="h-3 w-3 text-white" />}
+                                            </div>
+                                            <h4 className={`${['CONFIRMED', 'IN_PROGRESS', 'COMPLETED'].includes(currentConsultation?.status || '') ? 'text-slate-900' : 'text-slate-400'} font-medium pt-0.5`}>
+                                                Consultation Scheduled
+                                            </h4>
+                                            {(currentConsultation?.status === 'CONFIRMED' || currentConsultation?.status === 'IN_PROGRESS') && (
+                                                <p className="text-xs text-slate-500 mt-1">
+                                                    Scheduled for {new Date(currentConsultation.scheduledSlot?.date || '').toLocaleDateString()} at {currentConsultation.scheduledSlot?.time}
+                                                </p>
                                             )}
                                         </div>
-                                    </div>
 
-                                    {/* Step 2: Consultation Scheduled */}
-                                    <div className="relative pl-8 pb-8">
-                                        <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-2 ${['CONFIRMED', 'IN_PROGRESS', 'COMPLETED'].includes(currentConsultation?.status || '') ? 'border-green-500 bg-green-500' : 'border-slate-300 bg-white'} z-10 flex items-center justify-center`}>
-                                            {['CONFIRMED', 'IN_PROGRESS', 'COMPLETED'].includes(currentConsultation?.status || '') && <CheckCircle2 className="h-3 w-3 text-white" />}
+                                        {/* Step 3: Consultation Completed */}
+                                        <div className="relative pl-8">
+                                            <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-2 ${currentConsultation?.status === 'COMPLETED' ? 'border-green-500 bg-green-500' : 'border-slate-300 bg-white'} z-10 flex items-center justify-center`}>
+                                                {currentConsultation?.status === 'COMPLETED' && <CheckCircle2 className="h-3 w-3 text-white" />}
+                                            </div>
+                                            <h4 className={`${currentConsultation?.status === 'COMPLETED' ? 'text-slate-900' : 'text-slate-400'} font-medium pt-0.5`}>
+                                                Consultation Completed
+                                            </h4>
                                         </div>
-                                        <h4 className={`${['CONFIRMED', 'IN_PROGRESS', 'COMPLETED'].includes(currentConsultation?.status || '') ? 'text-slate-900' : 'text-slate-400'} font-medium pt-0.5`}>
-                                            Consultation Scheduled
-                                        </h4>
-                                        {(currentConsultation?.status === 'CONFIRMED' || currentConsultation?.status === 'IN_PROGRESS') && (
-                                            <p className="text-xs text-slate-500 mt-1">
-                                                Scheduled for {new Date(currentConsultation.scheduledSlot?.date || '').toLocaleDateString()} at {currentConsultation.scheduledSlot?.time}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    {/* Step 3: Consultation Completed */}
-                                    <div className="relative pl-8">
-                                        <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-2 ${currentConsultation?.status === 'COMPLETED' ? 'border-green-500 bg-green-500' : 'border-slate-300 bg-white'} z-10 flex items-center justify-center`}>
-                                            {currentConsultation?.status === 'COMPLETED' && <CheckCircle2 className="h-3 w-3 text-white" />}
-                                        </div>
-                                        <h4 className={`${currentConsultation?.status === 'COMPLETED' ? 'text-slate-900' : 'text-slate-400'} font-medium pt-0.5`}>
-                                            Consultation Completed
-                                        </h4>
                                     </div>
                                 </div>
                             </div>
-                        </div>
                         </div>
                     )}
                 </div>
@@ -778,10 +778,13 @@ export default function ConsultPage() {
                                     key={i}
                                     className={`flex flex-col ${msg.sender === 'User' ? 'items-end' : 'items-start'}`}
                                 >
+                                    <span className="text-[10px] font-bold text-slate-500 mb-1 px-1">
+                                        {msg.sender}
+                                    </span>
                                     <div
                                         className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${msg.sender === 'User'
-                                                ? 'bg-[#002A52] text-white'
-                                                : 'bg-slate-100 text-slate-900 border'
+                                            ? 'bg-[#002A52] text-white'
+                                            : 'bg-slate-100 text-slate-900 border'
                                             }`}
                                     >
                                         {msg.content}
@@ -828,8 +831,8 @@ export default function ConsultPage() {
                     </DialogHeader>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsRefundDialogOpen(false)}>Cancel</Button>
-                        <Button 
-                            variant="destructive" 
+                        <Button
+                            variant="destructive"
                             onClick={async () => {
                                 try {
                                     setIsRefundDialogOpen(false);

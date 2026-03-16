@@ -117,7 +117,7 @@ DocumentSchema.methods.linkToCompliance = async function (complianceId) {
     const Compliance = mongoose.model('Compliance');
     await Compliance.findByIdAndUpdate(
         complianceId,
-        { $addToSet: { attachments: this.url } }
+        { $addToSet: { attachments: { name: this.name, url: this.url } } }
     );
 
     return this.save();

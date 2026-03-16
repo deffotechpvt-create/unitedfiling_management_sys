@@ -91,6 +91,7 @@ exports.login = asyncHandler(async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        phone: user.phone,
         onboardingTasks: user.onboardingTasks,
       },
       message: 'Login successful'
@@ -127,6 +128,7 @@ exports.getMe = asyncHandler(async (req, res) => {
         phone: user.phone,
         role: user.role,
         status: user.status,
+        phone: user.phone,
         onboardingTasks: user.onboardingTasks,
       }
     })

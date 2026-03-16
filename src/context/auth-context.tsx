@@ -4,7 +4,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { authService } from "@/services/authService";
-import { User, LoginCredentials, RegisterData, AuthContextType } from "@/types";
+import { User, LoginCredentials, RegisterData, AuthContextType, OnboardingTasks } from "@/types";
+import { toast } from "sonner";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -32,7 +33,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
             setLoading(true);
             const response = await authService.getMe();
-
             if (response.success && response.user) {
                 const u = response.user as any;
                 setUser({ ...u, _id: u._id || u.id });
@@ -109,24 +109,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const updateProfile = async (data: Partial<User>) => {
+        const previousUser = user ? { ...user } : null;
+        // Optimistic update
+        setUser(prev => prev ? { ...prev, ...data } as User : null);
+
         try {
             setError(null);
-            setLoading(true);
-
             const response = await authService.updateProfile(data);
 
             if (response.success && response.user) {
                 const u = response.user as any;
                 setUser({ ...u, _id: u._id || u.id });
+                toast.success("Profile updated");
             } else {
-                throw new Error(response.message || "Update failed");
+                throw new Error("Update failed");
             }
         } catch (err: any) {
+            setUser(previousUser);
             const errorMessage = err.response?.data?.message || err.message || "Update failed";
             setError(errorMessage);
-            throw new Error(errorMessage);
-        } finally {
-            setLoading(false);
+            toast.error(errorMessage);
         }
     };
 
@@ -158,16 +160,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const updateOnboardingTask = React.useCallback(async (task: string, completed: boolean = true) => {
+    const updateOnboardingTask = React.useCallback(async (task: keyof OnboardingTasks, completed: boolean = true) => {
+        const previousUser = user ? { ...user } : null;
+        
+        // Optimistic update
+        setUser(prev => {
+            if (!prev) return null;
+            const updatedTasks = { 
+                exploreServices: false,
+                exploreDocuments: false,
+                consultExpert: false,
+                ...(prev.onboardingTasks || {}), 
+                [task]: completed 
+            } as OnboardingTasks;
+            return { ...prev, onboardingTasks: updatedTasks };
+        });
+
         try {
             const response = await authService.updateOnboardingTask(task, completed);
-            if (response.success && response.onboardingTasks) {
-                setUser(prev => prev ? { ...prev, onboardingTasks: response.onboardingTasks } : null);
+            if (!response.success) {
+                throw new Error("Failed to update task");
             }
         } catch (err: any) {
+            setUser(previousUser);
             console.error("Failed to update onboarding task:", err);
         }
-    }, []);
+    }, [user]);
 
     const value: AuthContextType = {
         user,

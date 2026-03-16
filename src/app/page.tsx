@@ -541,7 +541,7 @@ export default function DashboardPage() {
 
   // ADMIN see their dashboard
   if (isAdmin(user.role)) {
-    return <AdminDashboard role={user.role} userId={user._id} />;
+    return <AdminDashboard role={user.role} />;
   }
 
   // USER (Client) sees UserDashboard

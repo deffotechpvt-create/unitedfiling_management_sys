@@ -3,7 +3,6 @@ const constants = require('../config/constants');
 
 // 1. Schema Definition
 const ComplianceSchema = new mongoose.Schema({
-    // References
     company: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Company',
@@ -18,8 +17,6 @@ const ComplianceSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Service',
     },
-
-    // Details
     serviceType: {
         type: String,
         required: [true, 'Service type is required'],
@@ -53,8 +50,11 @@ const ComplianceSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
-
-    // Progress Tracking
+    price: {
+        type: Number,
+        default: 0,
+        min: [0, 'Price cannot be negative']
+    },
     stage: {
         type: String,
         enum: {
@@ -73,8 +73,6 @@ const ComplianceSchema = new mongoose.Schema({
         required: true,
         default: constants.COMPLIANCE_STATUS.PENDING,
     },
-
-    // Dates
     startDate: {
         type: Date,
         default: Date.now,
@@ -92,23 +90,15 @@ const ComplianceSchema = new mongoose.Schema({
     completedDate: {
         type: Date,
     },
-
-    // Assignment
     assignedTo: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
     },
-
-    // Additional Information
     notes: {
         type: String,
         maxlength: [2000, 'Notes cannot exceed 2000 characters'],
     },
-    attachments: [{
-        type: String, // File URLs
-    }],
-
-    // Payment Information (if needed)
+    attachments: [mongoose.Schema.Types.Mixed],
     payment: {
         amount: {
             type: Number,
@@ -123,8 +113,6 @@ const ComplianceSchema = new mongoose.Schema({
         razorpayPaymentId: String,
         razorpaySignature: String,
     },
-
-    // Audit Trail
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -141,20 +129,20 @@ const ComplianceSchema = new mongoose.Schema({
 });
 
 // 2. Indexes
-ComplianceSchema.index({ company: 1, status: 1, dueDate: -1 }); // Compound for filtering
+ComplianceSchema.index({ company: 1, status: 1, dueDate: -1 });
 ComplianceSchema.index({ client: 1 });
 ComplianceSchema.index({ assignedTo: 1 });
 ComplianceSchema.index({ stage: 1 });
 ComplianceSchema.index({ status: 1 });
-ComplianceSchema.index({ dueDate: 1 }); // For due date queries
+ComplianceSchema.index({ dueDate: 1 });
 
 // 3. Pre/Post Hooks
 
-/**
- * Pre-save: Auto-update status to DELAYED if overdue
- */
 ComplianceSchema.pre('save', function (next) {
-    // Auto-mark as delayed if past due date and not completed
+    // ✅ Capture isNew BEFORE save
+    this.wasNew = this.isNew;
+
+    // Auto-mark delayed if past due date and not completed
     if (
         this.status !== constants.COMPLIANCE_STATUS.COMPLETED &&
         this.status !== constants.COMPLIANCE_STATUS.FILING_DONE &&
@@ -163,7 +151,7 @@ ComplianceSchema.pre('save', function (next) {
         this.status = constants.COMPLIANCE_STATUS.DELAYED;
     }
 
-    // Set completed date if status changed to completed
+    // Auto-set completedDate
     if (
         this.isModified('status') &&
         (this.status === constants.COMPLIANCE_STATUS.COMPLETED ||
@@ -172,55 +160,171 @@ ComplianceSchema.pre('save', function (next) {
         this.completedDate = new Date();
     }
 
+    // Clear completedDate if re-opened
+    if (
+        this.isModified('status') &&
+        this.status !== constants.COMPLIANCE_STATUS.COMPLETED &&
+        this.status !== constants.COMPLIANCE_STATUS.FILING_DONE
+    ) {
+        this.completedDate = undefined;
+    }
+
     next();
 });
 
-/**
- * Post-save: Update client work metrics
- */
 ComplianceSchema.post('save', async function (doc) {
     const Client = mongoose.model('Client');
+    const CalendarEvent = mongoose.model('CalendarEvent');
 
-    // Recalculate client's pending and completed work
+    // ✅ Recalculate client metrics
     const pendingCount = await this.constructor.countDocuments({
         client: doc.client,
         status: { $in: [constants.COMPLIANCE_STATUS.PENDING, constants.COMPLIANCE_STATUS.DELAYED] },
     });
-
     const completedCount = await this.constructor.countDocuments({
         client: doc.client,
         status: { $in: [constants.COMPLIANCE_STATUS.COMPLETED, constants.COMPLIANCE_STATUS.FILING_DONE] },
     });
-
     await Client.findByIdAndUpdate(doc.client, {
         pendingWork: pendingCount,
         completedWork: completedCount,
     });
+
+    // ✅ NEW DOC → create exactly 1 calendar event directly
+    if (this.wasNew) {
+        try {
+            await CalendarEvent.create({
+                title: doc.serviceType,
+                compliance: doc._id,
+                company: doc.company,
+                client: doc.client,
+                serviceType: doc.serviceType,
+                department: doc.department || constants.DEPARTMENTS.OTHER,
+                deadlineDate: doc.dueDate,      // ✅ same due date as compliance
+                frequency: 'One-time',        // ✅ 1 compliance = 1 event
+                status: 'pending',
+                isMandatory: doc.isMandatory,
+                assignedTo: doc.assignedTo,   // ✅ Pass assigned expert
+                createdBy: doc.createdBy,
+            });
+            console.log(`[Calendar] ✅ 1 event created for: ${doc.serviceType}`);
+        } catch (err) {
+            console.error('[Calendar] ❌ Calendar event creation failed:', err.message);
+        }
+        return; // ✅ skip sync logic for new docs
+    }
+
+    try {
+        // ✅ Map compliance status → calendar status
+        const COMPLIANCE_TO_CALENDAR_STATUS = {
+            [constants.COMPLIANCE_STATUS.COMPLETED]: 'completed',
+            [constants.COMPLIANCE_STATUS.FILING_DONE]: 'completed',
+            [constants.COMPLIANCE_STATUS.PENDING]: 'pending',
+            [constants.COMPLIANCE_STATUS.DELAYED]: 'delayed',
+            [constants.COMPLIANCE_STATUS.OVERDUE]: 'overdue',
+            [constants.COMPLIANCE_STATUS.IN_PROGRESS]: 'in_progress',
+            [constants.COMPLIANCE_STATUS.NEEDS_ACTION]: 'needs_action',
+            [constants.COMPLIANCE_STATUS.WAITING_FOR_CLIENT]: 'waiting_for_client',
+        };
+
+        const calendarStatus = COMPLIANCE_TO_CALENDAR_STATUS[doc.status];
+        if (!calendarStatus) return;
+
+        // ✅ Find linked calendar event
+        const calendarEvent = await CalendarEvent.findOne({ compliance: doc._id });
+        if (!calendarEvent) {
+            console.log(`[Calendar] ℹ️ No linked calendar event found for compliance: ${doc._id}`);
+            return;
+        }
+
+        // ✅ Check if sync is needed
+        const hasStatusChanged = calendarEvent.status !== calendarStatus;
+        const hasAssigneeChanged = calendarEvent.assignedTo?.toString() !== doc.assignedTo?.toString();
+
+        if (!hasStatusChanged && !hasAssigneeChanged) return;
+
+        // ✅ Set sync flag to true BEFORE saving
+        calendarEvent._syncedFromCompliance = true;
+        
+        if (hasStatusChanged) {
+            calendarEvent.status = calendarStatus;
+            if (calendarStatus === 'completed') {
+                calendarEvent.completedDate = doc.completedDate || new Date();
+            } else {
+                calendarEvent.completedDate = null;
+            }
+        }
+
+        if (hasAssigneeChanged) {
+            calendarEvent.assignedTo = doc.assignedTo;
+        }
+
+        await calendarEvent.save();
+        console.log(`[Calendar] ✅ Synced compliance status "${doc.status}" → calendar status "${calendarStatus}" for: ${doc.serviceType}`);
+    } catch (err) {
+        console.error('[Calendar] ❌ Calendar sync failed:', err.message);
+    }
+});
+
+/**
+ * Handle Cleanup on Delete
+ * Deletes the linked CalendarEvent when a Compliance is deleted.
+ */
+ComplianceSchema.pre('deleteOne', { document: true, query: false }, async function (next) {
+    try {
+        const CalendarEvent = mongoose.model('CalendarEvent');
+        await CalendarEvent.deleteMany({ compliance: this._id });
+        next();
+    } catch (err) {
+        next(err);
+    }
+});
+
+ComplianceSchema.pre('findOneAndDelete', async function (next) {
+    try {
+        const docToDelete = await this.model.findOne(this.getQuery());
+        if (docToDelete) {
+            const CalendarEvent = mongoose.model('CalendarEvent');
+            await CalendarEvent.deleteMany({ compliance: docToDelete._id });
+        }
+        next();
+    } catch (err) {
+        next(err);
+    }
+});
+
+ComplianceSchema.pre('deleteMany', async function (next) {
+    try {
+        const CalendarEvent = mongoose.model('CalendarEvent');
+        const filter = this.getFilter();
+        
+        // If deleting by IDs (common in bulk delete)
+        if (filter._id && filter._id.$in) {
+            await CalendarEvent.deleteMany({ compliance: { $in: filter._id.$in } });
+        } else if (filter.company) {
+            // If deleting by company (cascading from company delete)
+            await CalendarEvent.deleteMany({ company: filter.company });
+        }
+        next();
+    } catch (err) {
+        next(err);
+    }
 });
 
 // 4. Instance Methods
 
-/**
- * Update stage
- */
 ComplianceSchema.methods.updateStage = async function (newStage, userId) {
     this.stage = newStage;
     this.updatedBy = userId;
     return this.save();
 };
 
-/**
- * Update status
- */
 ComplianceSchema.methods.updateStatus = async function (newStatus, userId) {
     this.status = newStatus;
     this.updatedBy = userId;
     return this.save();
 };
 
-/**
- * Assign to expert
- */
 ComplianceSchema.methods.assignToExpert = async function (expertId, expertName, userId) {
     this.assignedTo = expertId;
     this.expertName = expertName;
@@ -228,17 +332,12 @@ ComplianceSchema.methods.assignToExpert = async function (expertId, expertName, 
     return this.save();
 };
 
-/**
- * Add attachment
- */
-ComplianceSchema.methods.addAttachment = async function (fileUrl) {
-    this.attachments.push(fileUrl);
+ComplianceSchema.methods.addAttachment = async function (fileData) {
+    // fileData can be a string (URL) or an object { name, url }
+    this.attachments.push(fileData);
     return this.save();
 };
 
-/**
- * Mark as completed
- */
 ComplianceSchema.methods.markCompleted = async function (userId) {
     this.status = constants.COMPLIANCE_STATUS.COMPLETED;
     this.completedDate = new Date();
@@ -246,9 +345,6 @@ ComplianceSchema.methods.markCompleted = async function (userId) {
     return this.save();
 };
 
-/**
- * Add note
- */
 ComplianceSchema.methods.addNote = async function (note, userId) {
     this.notes = this.notes ? `${this.notes}\n---\n${note}` : note;
     this.updatedBy = userId;
@@ -257,18 +353,12 @@ ComplianceSchema.methods.addNote = async function (note, userId) {
 
 // 5. Static Methods
 
-/**
- * Find compliances by company
- */
 ComplianceSchema.statics.findByCompany = function (companyId, filters = {}) {
     return this.find({ company: companyId, ...filters })
         .populate('assignedTo', 'name email')
         .sort({ dueDate: 1 });
 };
 
-/**
- * Find compliances by client
- */
 ComplianceSchema.statics.findByClient = function (clientId) {
     return this.find({ client: clientId })
         .populate('company', 'name')
@@ -276,9 +366,6 @@ ComplianceSchema.statics.findByClient = function (clientId) {
         .sort({ dueDate: 1 });
 };
 
-/**
- * Find compliances assigned to admin
- */
 ComplianceSchema.statics.findByAdmin = function (adminId) {
     return this.find({ assignedTo: adminId })
         .populate('company', 'name')
@@ -286,9 +373,6 @@ ComplianceSchema.statics.findByAdmin = function (adminId) {
         .sort({ dueDate: 1 });
 };
 
-/**
- * Find unassigned compliances
- */
 ComplianceSchema.statics.findUnassigned = function () {
     return this.find({ assignedTo: null })
         .populate('company', 'name')
@@ -296,9 +380,6 @@ ComplianceSchema.statics.findUnassigned = function () {
         .sort({ createdAt: -1 });
 };
 
-/**
- * Find overdue compliances
- */
 ComplianceSchema.statics.findOverdue = function () {
     return this.find({
         dueDate: { $lt: new Date() },
@@ -306,63 +387,37 @@ ComplianceSchema.statics.findOverdue = function () {
     }).sort({ dueDate: 1 });
 };
 
-/**
- * Get compliance statistics for admin
- */
 ComplianceSchema.statics.getAdminStats = async function (adminId) {
     const total = await this.countDocuments({ assignedTo: adminId });
-    const pending = await this.countDocuments({
-        assignedTo: adminId,
-        status: constants.COMPLIANCE_STATUS.PENDING,
-    });
-    const delayed = await this.countDocuments({
-        assignedTo: adminId,
-        status: constants.COMPLIANCE_STATUS.DELAYED,
-    });
+    const pending = await this.countDocuments({ assignedTo: adminId, status: constants.COMPLIANCE_STATUS.PENDING });
+    const delayed = await this.countDocuments({ assignedTo: adminId, status: constants.COMPLIANCE_STATUS.DELAYED });
     const completed = await this.countDocuments({
         assignedTo: adminId,
         status: { $in: [constants.COMPLIANCE_STATUS.COMPLETED, constants.COMPLIANCE_STATUS.FILING_DONE] },
     });
-
     return { total, pending, delayed, completed };
 };
 
 // 6. Virtuals
 
-/**
- * Virtual: Check if overdue
- */
 ComplianceSchema.virtual('isOverdue').get(function () {
     if (
         this.status === constants.COMPLIANCE_STATUS.COMPLETED ||
         this.status === constants.COMPLIANCE_STATUS.FILING_DONE
-    ) {
-        return false;
-    }
+    ) return false;
     return new Date() > new Date(this.dueDate);
 });
 
-/**
- * Virtual: Days remaining
- */
 ComplianceSchema.virtual('daysRemaining').get(function () {
     const now = new Date();
     const due = new Date(this.dueDate);
-    const diffTime = due - now;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    return Math.ceil((due - now) / (1000 * 60 * 60 * 24));
 });
 
-/**
- * Virtual: Is assigned
- */
 ComplianceSchema.virtual('isAssigned').get(function () {
     return this.assignedTo !== null && this.assignedTo !== undefined;
 });
 
-/**
- * Virtual: Stage progress percentage
- */
 ComplianceSchema.virtual('progressPercentage').get(function () {
     const stages = Object.values(constants.COMPLIANCE_STAGES);
     const currentIndex = stages.indexOf(this.stage);
@@ -371,37 +426,10 @@ ComplianceSchema.virtual('progressPercentage').get(function () {
 
 // 7. Query Helpers
 
-/**
- * Filter by status
- */
-ComplianceSchema.query.byStatus = function (status) {
-    return this.where({ status });
-};
-
-/**
- * Filter by stage
- */
-ComplianceSchema.query.byStage = function (stage) {
-    return this.where({ stage });
-};
-
-/**
- * Filter assigned compliances
- */
-ComplianceSchema.query.assigned = function () {
-    return this.where({ assignedTo: { $ne: null } });
-};
-
-/**
- * Filter unassigned compliances
- */
-ComplianceSchema.query.unassigned = function () {
-    return this.where({ assignedTo: null });
-};
-
-/**
- * Filter overdue compliances
- */
+ComplianceSchema.query.byStatus = function (status) { return this.where({ status }); };
+ComplianceSchema.query.byStage = function (stage) { return this.where({ stage }); };
+ComplianceSchema.query.assigned = function () { return this.where({ assignedTo: { $ne: null } }); };
+ComplianceSchema.query.unassigned = function () { return this.where({ assignedTo: null }); };
 ComplianceSchema.query.overdue = function () {
     return this.where({
         dueDate: { $lt: new Date() },

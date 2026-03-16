@@ -12,7 +12,8 @@ const serviceRoutes = require('./serviceRoutes');
 const reportRoutes = require('./reportRoutes');
 const consultationRoutes = require('./consultationRoutes');
 const documentRoutes = require('./documentRoutes');
-
+const calendarRoutes = require('./calendarRoutes');
+const paymentRoutes = require('./paymentRoutes');
 // Register route
 
 router.use('/auth', authRoutes);
@@ -25,6 +26,8 @@ router.use('/services', serviceRoutes);
 router.use('/reports', reportRoutes);
 router.use('/consultations', consultationRoutes);
 router.use('/documents', documentRoutes);
+router.use('/calendar', calendarRoutes);
+router.use('/payments', paymentRoutes);
 
 // Health check for API
 router.get('/health', (req, res) => {

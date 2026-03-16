@@ -22,6 +22,8 @@ interface DocumentContextType {
     uploadDocument: (data: UploadDocumentData) => Promise<boolean>;
     deleteDocument: (id: string) => Promise<void>;
     updateDocument: (id: string, data: any) => Promise<void>;
+    pagination: { page: number; limit: number; totalPages: number; totalCount: number };
+    setPage: (page: number) => void;
     refreshAll: (force?: boolean) => Promise<void>;
 }
 
@@ -36,6 +38,11 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     const [error, setError] = useState<string | null>(null);
     const { user, isAuthenticated } = useAuth();
     const { selectedCompany } = useCompany();
+    const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1, totalCount: 0 });
+
+    const setPage = (page: number) => {
+        setPagination(prev => ({ ...prev, page }));
+    };
 
     const lastFetchTime = useRef<{ documents: number; folders: number }>({ documents: 0, folders: 0 });
     const isFetching = useRef<{ documents: boolean; folders: boolean }>({ documents: false, folders: false });
@@ -50,13 +57,25 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
         if (isFetching.current.documents) return;
         isFetching.current.documents = true;
 
-        setLoading(true);
+        // Only show global loading on absolute first load
+        if (documents.length === 0 && !lastFetchTime.current.documents) {
+            setLoading(true);
+        }
         setError(null);
         try {
             // Default to selected company if no filters provided and not admin/super-admin
-            const defaultFilters = !filters && selectedCompany?._id ? { companyId: selectedCompany._id } : filters;
+            const defaultFilters = {
+                ...(!filters && selectedCompany?._id ? { companyId: selectedCompany._id } : filters),
+                page: pagination.page,
+                limit: pagination.limit
+            };
             const response = await documentService.listDocuments(defaultFilters);
             setDocuments(response.documents);
+            setPagination(prev => ({
+                ...prev,
+                totalPages: response.totalPages || 1,
+                totalCount: response.totalDocs || 0
+            }));
             lastFetchTime.current.documents = Date.now();
         } catch (err: any) {
             const msg = err.response?.data?.message || "Failed to fetch documents";
@@ -96,38 +115,70 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     }, [fetchDocuments, fetchFolders]);
 
     const uploadDocument = async (data: UploadDocumentData) => {
-        setLoading(true);
+        const tempId = `temp-${Date.now()}`;
+        const tempDoc: Document = {
+            _id: tempId,
+            name: data.name || data.file.name,
+            url: "",
+            publicId: "",
+            folder: data.folder || "General",
+            fileSize: data.file.size,
+            mimeType: data.file.type,
+            uploadedBy: user?._id || "",
+            createdAt: new Date().toISOString(),
+            status: 'uploading'
+        };
+
+        setDocuments(prev => [tempDoc, ...prev]);
+
         try {
             await documentService.uploadDocument(data);
-            toast.success("Document uploaded successfully");
-            refreshAll(true);
+            toast.success("Uploaded");
+            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            // Refresh to get actual doc with URL and ID
+            fetchDocuments(true);
             return true;
         } catch (err: any) {
+            setDocuments(prev => prev.filter(d => d._id !== tempId));
             const msg = err.response?.data?.message || "Failed to upload document";
             toast.error(msg);
             return false;
-        } finally {
-            setLoading(false);
         }
     };
 
     const deleteDocument = async (id: string) => {
+        const previousDocs = [...documents];
+        
+        // Optimistic delete
+        setDocuments(prev => prev.filter(doc => doc._id !== id));
+
         try {
             await documentService.deleteDocument(id);
-            toast.success("Document deleted");
-            setDocuments(prev => prev.filter(doc => doc._id !== id));
+            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            toast.success("Deleted");
+            // Background sync (doesn't trigger global loading if quiet)
+            fetchFolders(true);
         } catch (err: any) {
-            toast.error("Failed to delete document");
+            setDocuments(previousDocs);
+            toast.error(err.response?.data?.message || "Failed to delete document");
         }
     };
 
     const updateDocument = async (id: string, data: any) => {
+        const previousDocs = [...documents];
+        
+        // Optimistic update
+        setDocuments(prev => prev.map(doc => doc._id === id ? { ...doc, ...data } : doc));
+
         try {
             await documentService.updateDocument(id, data);
-            toast.success("Document updated");
-            refreshAll(true);
+            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            toast.success("Updated");
+            // Sync metadata in background
+            fetchFolders(true);
         } catch (err: any) {
-            toast.error("Failed to update document");
+            setDocuments(previousDocs);
+            toast.error(err.response?.data?.message || "Failed to update document");
         }
     };
 
@@ -142,7 +193,18 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
 
         // Only fetch if authenticated
         refreshAll(false);
-    }, [user?._id, isAuthenticated, selectedCompany?._id, refreshAll]);
+    }, [user?._id, isAuthenticated, selectedCompany?._id, refreshAll, pagination.page]);
+
+    // ✅ Listen for sync signals from other modules
+    useEffect(() => {
+        const handleSync = () => {
+            if (!isAuthenticated) return;
+            console.log("[Document] 🔄 Syncing data from broadcast...");
+            refreshAll(true);
+        };
+        window.addEventListener('app:sync-data', handleSync);
+        return () => window.removeEventListener('app:sync-data', handleSync);
+    }, [isAuthenticated, refreshAll]);
 
     return (
         <DocumentContext.Provider
@@ -156,7 +218,9 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
                 uploadDocument,
                 deleteDocument,
                 updateDocument,
-                refreshAll
+                refreshAll,
+                pagination,
+                setPage
             }}
         >
             {children}

@@ -28,6 +28,7 @@ module.exports = {
     DELAYED: 'DELAYED',
     OVERDUE: 'OVERDUE',
     FILING_DONE: 'FILING_DONE',
+    PAYMENT_DONE: 'PAYMENT_DONE',
   },
 
   // Compliance Stages

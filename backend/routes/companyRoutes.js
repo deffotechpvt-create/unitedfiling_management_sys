@@ -12,12 +12,19 @@ const { SUPER_ADMIN, ADMIN } = constants.ROLES;
 // ─────────────────────────────────────────────────────────────────────────────
 
 // GET /api/companies/stats/overview
-// Access: SUPER_ADMIN (all), ADMIN (their assigned clients only — enforced in controller)
 router.get(
     '/stats/overview',
     protect,
     checkRole(SUPER_ADMIN, ADMIN),
     companyController.getCompanyStats
+);
+
+// GET /api/companies/export
+router.get(
+    '/export',
+    protect,
+    checkRole(SUPER_ADMIN, ADMIN),
+    companyController.exportCompanies
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -39,7 +46,7 @@ router.route('/')
 router.route('/:id')
     .get(protect, companyController.getCompanyById)
     .put(protect, companyController.updateCompany)
-    .delete(protect, checkRole(SUPER_ADMIN, ADMIN), companyController.deleteCompany);
+    .delete(protect, checkRole(SUPER_ADMIN), companyController.deleteCompany);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MEMBER MANAGEMENT  (SUPER_ADMIN and ADMIN only — USER cannot manage members)
@@ -65,7 +72,7 @@ router.post(
 router.delete(
     '/:id/members/:userId',
     protect,
-    checkRole(SUPER_ADMIN, ADMIN),
+    checkRole(SUPER_ADMIN),
     companyController.removeMember
 );
 

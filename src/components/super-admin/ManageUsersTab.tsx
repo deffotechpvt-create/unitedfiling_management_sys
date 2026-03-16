@@ -80,7 +80,7 @@ export function ManageUsersTab() {
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={refreshAllUsers}
+                            onClick={() => refreshAllUsers()}
                             disabled={loading}
                             className="h-10"
                         >
