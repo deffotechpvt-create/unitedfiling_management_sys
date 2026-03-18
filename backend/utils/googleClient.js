@@ -1,10 +1,18 @@
 const { google } = require('googleapis');
 require('dotenv').config();
 
+let googleRedirectUri = process.env.GOOGLE_REDIRECT_URI;
+
+if (process.env.NODE_ENV === 'production' && process.env.BACKEND_URL) {
+    googleRedirectUri = `${process.env.BACKEND_URL}/api/google/auth/callback`;
+} else if (process.env.NODE_ENV === 'development') {
+    googleRedirectUri = 'http://localhost:5000/api/google/auth/callback';
+}
+
 const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
+    googleRedirectUri
 );
 
 // Define the required scopes for Google Calendar and basic profile
