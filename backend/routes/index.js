@@ -14,6 +14,7 @@ const consultationRoutes = require('./consultationRoutes');
 const documentRoutes = require('./documentRoutes');
 const calendarRoutes = require('./calendarRoutes');
 const paymentRoutes = require('./paymentRoutes');
+const googleCalendarRoutes = require('./googleCalendarRoutes');
 // Register route
 
 router.use('/auth', authRoutes);
@@ -27,6 +28,7 @@ router.use('/reports', reportRoutes);
 router.use('/consultations', consultationRoutes);
 router.use('/documents', documentRoutes);
 router.use('/calendar', calendarRoutes);
+router.use('/google', googleCalendarRoutes); // Google Integration
 router.use('/payments', paymentRoutes);
 
 // Health check for API

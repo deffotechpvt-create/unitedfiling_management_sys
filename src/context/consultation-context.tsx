@@ -153,7 +153,7 @@ export function ConsultationProvider({ children }: { children: React.ReactNode }
                 consultationData
             });
             // ✅ Sync across all modules
-            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            window.dispatchEvent(new CustomEvent('app:sync-consultation'));
             toast.success("Consultation booked & payment successful!");
             fetchMyConsultations(true);
             return true;
@@ -202,7 +202,7 @@ export function ConsultationProvider({ children }: { children: React.ReactNode }
 
         try {
             await consultationService.assignExpert(id, expertId);
-            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            window.dispatchEvent(new CustomEvent('app:sync-consultation'));
             toast.success("Expert assigned");
             fetchMyConsultations(true);
         } catch (err: any) {
@@ -217,7 +217,7 @@ export function ConsultationProvider({ children }: { children: React.ReactNode }
 
         try {
             await consultationService.updateStatus(id, status);
-            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            window.dispatchEvent(new CustomEvent('app:sync-consultation'));
             toast.success("Status updated");
             fetchMyConsultations(true);
         } catch (err: any) {
@@ -246,15 +246,20 @@ export function ConsultationProvider({ children }: { children: React.ReactNode }
         refreshAll(false);
     }, [user?._id, isAuthenticated, refreshAll, pagination.page]);
 
-    // ✅ Listen for sync signals from other modules
     useEffect(() => {
-        const handleSync = () => {
+        const handleSync = (e: any) => {
             if (!isAuthenticated) return;
-            console.log("[Consultation] 🔄 Syncing data from broadcast...");
-            refreshAll(true);
+            if (e.type === 'app:sync-consultation' || e.type === 'app:sync-data') {
+                console.log(`[Consultation] 🔄 Syncing data from broadcast (${e.type})...`);
+                refreshAll(true);
+            }
         };
         window.addEventListener('app:sync-data', handleSync);
-        return () => window.removeEventListener('app:sync-data', handleSync);
+        window.addEventListener('app:sync-consultation', handleSync);
+        return () => {
+            window.removeEventListener('app:sync-data', handleSync);
+            window.removeEventListener('app:sync-consultation', handleSync);
+        };
     }, [isAuthenticated, refreshAll]);
 
     return (

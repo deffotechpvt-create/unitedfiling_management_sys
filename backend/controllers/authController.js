@@ -54,6 +54,8 @@ exports.register = asyncHandler(async (req, res) => {
         phone: user.phone,
         role: user.role,
         onboardingTasks: user.onboardingTasks,
+        isOnboardingCompleted: user.isOnboardingCompleted,
+        onboardingData: user.onboardingData,
       },
       message: 'User registered successfully'
     })
@@ -93,6 +95,8 @@ exports.login = asyncHandler(async (req, res) => {
         role: user.role,
         phone: user.phone,
         onboardingTasks: user.onboardingTasks,
+        isOnboardingCompleted: user.isOnboardingCompleted,
+        onboardingData: user.onboardingData,
       },
       message: 'Login successful'
     })
@@ -128,8 +132,9 @@ exports.getMe = asyncHandler(async (req, res) => {
         phone: user.phone,
         role: user.role,
         status: user.status,
-        phone: user.phone,
         onboardingTasks: user.onboardingTasks,
+        isOnboardingCompleted: user.isOnboardingCompleted,
+        onboardingData: user.onboardingData,
       }
     })
   );
@@ -160,6 +165,8 @@ exports.updateProfile = asyncHandler(async (req, res) => {
         phone: user.phone,
         role: user.role,
         onboardingTasks: user.onboardingTasks,
+        isOnboardingCompleted: user.isOnboardingCompleted,
+        onboardingData: user.onboardingData,
       },
       message: 'Profile updated successfully'
     })
@@ -282,6 +289,38 @@ exports.updateOnboardingTask = asyncHandler(async (req, res) => {
     new ApiResponse(200, {
       onboardingTasks: user.onboardingTasks,
       message: 'Onboarding task updated'
+    })
+  );
+});
+
+/**
+ * @desc    Complete onboarding and save data
+ * @route   POST /api/auth/onboarding/complete
+ * @access  Private
+ */
+exports.completeOnboarding = asyncHandler(async (req, res) => {
+  const { data } = req.body;
+
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  user.isOnboardingCompleted = true;
+  user.onboardingData = data;
+  await user.save();
+
+  res.status(200).json(
+    new ApiResponse(200, {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isOnboardingCompleted: user.isOnboardingCompleted,
+        onboardingData: user.onboardingData,
+      },
+      message: 'Onboarding completed successfully'
     })
   );
 });

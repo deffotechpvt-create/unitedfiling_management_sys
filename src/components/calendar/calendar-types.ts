@@ -44,6 +44,14 @@ export const STATUS_CONFIG: Record<CalendarEventStatus, {
         label: "Completed",
         className: "bg-emerald-100 text-emerald-700 border-emerald-200",
     },
+    payment_done: {
+        label: "Payment Done",
+        className: "bg-indigo-100 text-indigo-700 border-indigo-200",
+    },
+    filing_done: {
+        label: "Filing Done",
+        className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    },
     delayed: {
         label: "Delayed",
         className: "bg-red-100 text-red-700 border-red-200",

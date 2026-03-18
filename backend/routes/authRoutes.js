@@ -9,6 +9,7 @@ const {
   forgotPassword,
   resetPassword,
   updateOnboardingTask,
+  completeOnboarding,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const { validateRegistration, validateLogin} = require('../validators/authValidator');
@@ -24,5 +25,6 @@ router.get('/me', protect, getMe);
 router.post('/logout', protect, logout);
 router.put('/profile', protect, updateProfile);
 router.patch('/onboarding/:task', protect, updateOnboardingTask);
+router.post('/onboarding/complete', protect, completeOnboarding);
 
 module.exports = router;

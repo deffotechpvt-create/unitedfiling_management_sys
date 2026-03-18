@@ -179,7 +179,7 @@ ComplianceSchema.post('save', async function (doc) {
     // ✅ Recalculate client metrics
     const pendingCount = await this.constructor.countDocuments({
         client: doc.client,
-        status: { $in: [constants.COMPLIANCE_STATUS.PENDING, constants.COMPLIANCE_STATUS.DELAYED] },
+        status: { $nin: [constants.COMPLIANCE_STATUS.COMPLETED, constants.COMPLIANCE_STATUS.FILING_DONE] },
     });
     const completedCount = await this.constructor.countDocuments({
         client: doc.client,
@@ -206,6 +206,7 @@ ComplianceSchema.post('save', async function (doc) {
                 isMandatory: doc.isMandatory,
                 assignedTo: doc.assignedTo,   // ✅ Pass assigned expert
                 createdBy: doc.createdBy,
+                stage: doc.stage,             // ✅ Pass initial stage
             });
             console.log(`[Calendar] ✅ 1 event created for: ${doc.serviceType}`);
         } catch (err) {
@@ -218,13 +219,14 @@ ComplianceSchema.post('save', async function (doc) {
         // ✅ Map compliance status → calendar status
         const COMPLIANCE_TO_CALENDAR_STATUS = {
             [constants.COMPLIANCE_STATUS.COMPLETED]: 'completed',
-            [constants.COMPLIANCE_STATUS.FILING_DONE]: 'completed',
+            [constants.COMPLIANCE_STATUS.FILING_DONE]: 'filing_done',
             [constants.COMPLIANCE_STATUS.PENDING]: 'pending',
             [constants.COMPLIANCE_STATUS.DELAYED]: 'delayed',
             [constants.COMPLIANCE_STATUS.OVERDUE]: 'overdue',
             [constants.COMPLIANCE_STATUS.IN_PROGRESS]: 'in_progress',
             [constants.COMPLIANCE_STATUS.NEEDS_ACTION]: 'needs_action',
             [constants.COMPLIANCE_STATUS.WAITING_FOR_CLIENT]: 'waiting_for_client',
+            [constants.COMPLIANCE_STATUS.PAYMENT_DONE]: 'payment_done',
         };
 
         const calendarStatus = COMPLIANCE_TO_CALENDAR_STATUS[doc.status];
@@ -239,9 +241,10 @@ ComplianceSchema.post('save', async function (doc) {
 
         // ✅ Check if sync is needed
         const hasStatusChanged = calendarEvent.status !== calendarStatus;
+        const hasStageChanged = calendarEvent.stage !== doc.stage;
         const hasAssigneeChanged = calendarEvent.assignedTo?.toString() !== doc.assignedTo?.toString();
 
-        if (!hasStatusChanged && !hasAssigneeChanged) return;
+        if (!hasStatusChanged && !hasStageChanged && !hasAssigneeChanged) return;
 
         // ✅ Set sync flag to true BEFORE saving
         calendarEvent._syncedFromCompliance = true;
@@ -253,6 +256,10 @@ ComplianceSchema.post('save', async function (doc) {
             } else {
                 calendarEvent.completedDate = null;
             }
+        }
+
+        if (hasStageChanged) {
+            calendarEvent.stage = doc.stage;
         }
 
         if (hasAssigneeChanged) {

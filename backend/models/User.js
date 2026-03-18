@@ -56,6 +56,20 @@ const UserSchema = new mongoose.Schema({
         type: Date,
     },
 
+    // Google Integration
+    googleId: {
+        type: String,
+        default: null
+    },
+    googleAccessToken: {
+        type: String,
+        default: null
+    },
+    googleRefreshToken: {
+        type: String,
+        default: null
+    },
+
     resetPasswordToken: String,
     resetPasswordExpires: Date,
 
@@ -63,6 +77,14 @@ const UserSchema = new mongoose.Schema({
         exploreServices: { type: Boolean, default: false },
         exploreDocuments: { type: Boolean, default: false },
         consultExpert: { type: Boolean, default: false },
+    },
+    isOnboardingCompleted: {
+        type: Boolean,
+        default: false,
+    },
+    onboardingData: {
+        type: Object,
+        default: null,
     },
 
     createdAt: {

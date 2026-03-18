@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Search, Trash2, Download, AlertCircle, X, ChevronDown, FileCheck2, RefreshCcw, ChevronLeft, ChevronRight, CreditCard, Info } from "lucide-react"
+import { Search, Trash2, Download, AlertCircle, X, ChevronDown, FileCheck2, RefreshCcw, ChevronLeft, ChevronRight, CreditCard, Info, Briefcase } from "lucide-react"
 import { ComplianceActionDialog } from "@/components/compliance/ComplianceActionDialog"
 import { CreateComplianceDialog } from "@/components/compliance/CreateComplianceDialog"
 import { CreateTemplateDialog } from "@/components/compliance/CreateTemplateDialog"
@@ -38,12 +38,10 @@ import { Badge } from "@/components/ui/badge"
 export function CompliancesPageClient() {
     const { selectedCompany } = useCompany()
     const { user } = useAuth();
-    console.log("user",user);
+    console.log("user", user);
     const {
         compliances,
         stats,
-        refreshAll,
-        globalSearch,
         loading: isLoading,
         error,
         deleteCompliances,
@@ -51,42 +49,33 @@ export function CompliancesPageClient() {
         admins,
         pagination,
         setPage,
+        filters,
+        setFilters
     } = useCompliance();
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     // Filters State
-    const [searchQuery, setSearchQuery] = useState("")
-    const [debouncedSearch, setDebouncedSearch] = useState("")
+    const [searchQuery, setSearchQuery] = useState(filters.search)
     const [filterInternal, setFilterInternal] = useState(false)
     const [filterMandatory, setFilterMandatory] = useState(false)
-    const [activeTab, setActiveTab] = useState("All")
 
     // Search Debouncing Logic
-    const isFirstRender = useRef(true);
     useEffect(() => {
-        if (isFirstRender.current) {
-            isFirstRender.current = false;
-            return;
-        }
-        
         // If query is empty, update immediately for fast reset
         if (!searchQuery) {
-            setDebouncedSearch("");
+            setFilters({ search: "" });
             return;
         }
 
         const timer = setTimeout(() => {
-            setDebouncedSearch(searchQuery);
+            setFilters({ search: searchQuery });
         }, 400); // 400ms debounce
         return () => clearTimeout(timer);
-    }, [searchQuery]);
+    }, [searchQuery, setFilters]);
 
     // Filter Logic States
-    const [selectedDept, setSelectedDept] = useState<string | null>(null)
-    const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-    const [tempCategories, setTempCategories] = useState<string[]>([]) // For the "Apply" pattern
+    const [tempCategories, setTempCategories] = useState<string[]>(filters.category) // For the "Apply" pattern
     const [selectedDueDate, setSelectedDueDate] = useState<string | null>(null)
-    const [selectedExpert, setSelectedExpert] = useState<string | null>("all")
 
     // Options
     const departments = [
@@ -120,11 +109,14 @@ export function CompliancesPageClient() {
     // Reset filters on company change
     useEffect(() => {
         setSearchQuery("");
-        setSelectedDept(null);
-        setSelectedCategories([]);
+        setFilters({
+            search: "",
+            department: null,
+            category: []
+        });
         setTempCategories([]);
-        // Keep activeTab and selectedDueDate as they are often persistent preferences
-    }, [selectedCompany?._id]);
+        // Keep tab and selectedDueDate as they are often persistent preferences
+    }, [selectedCompany?._id, setFilters]);
 
     const [selectedCompliance, setSelectedCompliance] = useState<any>(null);
     const [isActionOpen, setIsActionOpen] = useState(false);
@@ -136,18 +128,19 @@ export function CompliancesPageClient() {
     const canManage = isSuperAdmin || isAdmin;
 
     const handleDeptChange = useCallback((val: string) => {
-        if (val === selectedDept) return;
-        setSelectedDept(val);
-        setSelectedCategories([]); // Reset categories when dept changes
+        if (val === filters.department) return;
+        setFilters({ 
+            department: val,
+            category: [] // Reset categories when dept changes
+        });
         setTempCategories([]);
-    }, [selectedDept]);
+    }, [filters.department, setFilters]);
 
     const clearDept = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
-        setSelectedDept(null);
-        setSelectedCategories([]);
+        setFilters({ department: null, category: [] });
         setTempCategories([]);
-    }, []);
+    }, [setFilters]);
 
     const clearDueDate = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
@@ -156,44 +149,32 @@ export function CompliancesPageClient() {
 
     const resetAllFilters = useCallback(() => {
         setSearchQuery("");
-        setSelectedDept(null);
-        setSelectedCategories([]);
+        setFilters({
+            department: null,
+            category: [],
+            search: "",
+            assignedTo: "all"
+        });
         setTempCategories([]);
         setSelectedDueDate(null);
         setFilterInternal(false);
         setFilterMandatory(false);
-        setSelectedExpert("all");
-    }, []);
+    }, [setFilters]);
 
     const toggleCategory = useCallback((cat: string) => {
         setTempCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
     }, []);
 
     const applyCategories = useCallback(() => {
-        setSelectedCategories(tempCategories);
-    }, [tempCategories]);
-
-    // REAL-TIME BACKEND FETCHING
-    useEffect(() => {
-        const filters: any = {};
-        const combinedSearch = globalSearch || debouncedSearch;
-        if (combinedSearch) filters.search = combinedSearch;
-        if (selectedDept) filters.department = selectedDept;
-        if (selectedCategories.length > 0) filters.category = selectedCategories;
-        if (selectedExpert !== "all") filters.assignedTo = selectedExpert;
-        
-        // Include pagination
-        filters.page = pagination.currentPage;
-        filters.limit = 10;
-
-        refreshAll(selectedCompany?._id, false, filters);
-    }, [debouncedSearch, globalSearch, selectedDept, selectedCategories, selectedExpert, selectedCompany?._id, refreshAll, pagination.currentPage]);
+        setFilters({ category: tempCategories });
+    }, [tempCategories, setFilters]);
 
     const handleCategoryOpen = useCallback((open: boolean) => {
         if (open) {
-            setTempCategories(selectedCategories)
+            setTempCategories(filters.category)
         }
-    }, [selectedCategories]);
+    }, [filters.category]);
+
 
     // Format Status Utility
     const formatComplianceStatus = (status: string) => {
@@ -210,56 +191,6 @@ export function CompliancesPageClient() {
         }
     };
 
-    // Core Filter Engine - Phase 1: Filter by all EXCEPT activeTab for correct counts
-    const filteredByCommonControls = useMemo(() => {
-        return (compliances || []).filter((c: any) => {
-            const dueDateObj = new Date(c.dueDate);
-            const now = new Date();
-
-            // 1. Search Filter (Already handled by backend, but keeping locally for instant UI response)
-            const combinedSearch = (globalSearch || searchQuery).toLowerCase();
-            if (combinedSearch) {
-                const matchesName = c.serviceType?.toLowerCase().includes(combinedSearch);
-                const matchesExpert = c.expertName?.toLowerCase().includes(combinedSearch);
-                const matchesOffice = c.company?.name?.toLowerCase().includes(combinedSearch);
-                if (!matchesName && !matchesExpert && !matchesOffice) return false;
-            }
-
-            // 2. Toggles
-            if (filterMandatory && !(c.risk === "HIGH" || c.isMandatory)) return false;
-            if (filterInternal && !c.isInternal) return false;
-
-            // 3. Department Filter (Already handled by backend)
-            if (selectedDept && c.department !== selectedDept) return false;
-
-            // 4. Category Filter (Already handled by backend)
-            if (selectedCategories.length > 0 && !selectedCategories.includes(c.category)) return false;
-
-            // 5. Due Date Filter
-            if (selectedDueDate) {
-                const startOfWeek = new Date(now);
-                startOfWeek.setDate(now.getDate() - now.getDay());
-                const endOfWeek = new Date(startOfWeek);
-                endOfWeek.setDate(startOfWeek.getDate() + 6);
-
-                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-                if (selectedDueDate === "This Week") {
-                    if (dueDateObj < startOfWeek || dueDateObj > endOfWeek) return false;
-                } else if (selectedDueDate === "This Month") {
-                    if (dueDateObj < startOfMonth || dueDateObj > endOfMonth) return false;
-                } else if (selectedDueDate === "Previous Month") {
-                    const startPrev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                    const endPrev = new Date(now.getFullYear(), now.getMonth(), 0);
-                    if (dueDateObj < startPrev || dueDateObj > endPrev) return false;
-                }
-            }
-
-            return true;
-        });
-    }, [compliances, searchQuery, globalSearch, filterMandatory, filterInternal, selectedDept, selectedCategories, selectedDueDate]);
-
     // Calculate dynamic counts for tabs based on server stats
     const tabs = useMemo(() => {
         if (!stats) return [
@@ -268,6 +199,8 @@ export function CompliancesPageClient() {
             { name: "Needs action", count: 0 },
             { name: "In progress", count: 0 },
             { name: "Waiting For Client", count: 0 },
+            { name: "Payment", count: 0 },
+            { name: "Service", count: 0 },
             { name: "Completed", count: 0 },
             { name: "Delayed", count: 0 },
             { name: "Overdue", count: 0 },
@@ -279,33 +212,13 @@ export function CompliancesPageClient() {
             { name: "Needs action", count: stats.needsAction || 0 },
             { name: "In progress", count: stats.inProgress || 0 },
             { name: "Waiting For Client", count: stats.waitingForClient || 0 },
+            { name: "Payment", count: stats.paymentDone || 0 },
+            { name: "Service", count: stats.service || 0 },
             { name: "Completed", count: stats.completed || 0 },
             { name: "Delayed", count: stats.delayed || 0 },
             { name: "Overdue", count: stats.overdue || 0 },
         ]
     }, [stats]);
-
-    // Core Filter Engine - Phase 2: Final filter by activeTab
-    const finalFilteredCompliances = useMemo(() => {
-        return filteredByCommonControls.filter((c: any) => {
-            if (activeTab === "Pending") {
-                return c.status === "PENDING";
-            } else if (activeTab === "Needs action") {
-                return c.status === "NEEDS_ACTION";
-            } else if (activeTab === "In progress") {
-                return c.status === "IN_PROGRESS";
-            } else if (activeTab === "Waiting For Client") {
-                return c.status === "WAITING_FOR_CLIENT";
-            } else if (activeTab === "Completed") {
-                return ["COMPLETED", "FILING_DONE"].includes(c.status);
-            } else if (activeTab === "Delayed") {
-                return c.status === "DELAYED";
-            } else if (activeTab === "Overdue") {
-                return c.status === "OVERDUE";
-            }
-            return true;
-        });
-    }, [filteredByCommonControls, activeTab]);
 
     const handleDiscountClick = () => {
         window.location.href = "/subscription-manager";
@@ -324,10 +237,10 @@ export function CompliancesPageClient() {
     };
 
     const toggleSelectAll = () => {
-        if (selectedIds.length === finalFilteredCompliances.length) {
+        if (selectedIds.length === compliances.length) {
             setSelectedIds([]);
         } else {
-            setSelectedIds(finalFilteredCompliances.map((c: any) => c._id || c.id));
+            setSelectedIds(compliances.map((c: any) => c._id || c.id));
         }
     };
 
@@ -337,13 +250,12 @@ export function CompliancesPageClient() {
         );
     };
     const handleExport = () => {
-        const filters: any = {};
-        const combinedSearch = globalSearch || debouncedSearch;
-        if (combinedSearch) filters.search = combinedSearch;
-        if (selectedDept) filters.department = selectedDept;
-        if (selectedCategories.length > 0) filters.category = selectedCategories;
-        
-        exportAllCompliances(filters);
+        const exportFilters: any = {};
+        if (filters.search) exportFilters.search = filters.search;
+        if (filters.department) exportFilters.department = filters.department;
+        if (filters.category.length > 0) exportFilters.category = filters.category;
+
+        exportAllCompliances(exportFilters);
     };
 
     return (
@@ -428,8 +340,8 @@ export function CompliancesPageClient() {
                 <div className="space-y-1">
                     <label className="text-sm font-medium text-slate-700">Compliance Department</label>
                     <div className="relative">
-                        <Select value={selectedDept || "NONE"} onValueChange={(val) => handleDeptChange(val === "NONE" ? "" : val)}>
-                            <SelectTrigger className={cn("bg-white border-slate-200 min-h-10 pr-9", selectedDept ? "bg-slate-100/50" : "")}>
+                        <Select value={filters.department || "NONE"} onValueChange={(val) => handleDeptChange(val === "NONE" ? "" : val)}>
+                            <SelectTrigger className={cn("bg-white border-slate-200 min-h-10 pr-9", filters.department ? "bg-slate-100/50" : "")}>
                                 <SelectValue placeholder="Select" />
                             </SelectTrigger>
                             <SelectContent>
@@ -437,7 +349,7 @@ export function CompliancesPageClient() {
                                 {departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
                             </SelectContent>
                         </Select>
-                        {selectedDept && (
+                        {filters.department && (
                             <button
                                 onClick={clearDept}
                                 className="absolute right-8 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-200 rounded-full transition-colors z-20"
@@ -456,21 +368,21 @@ export function CompliancesPageClient() {
                             <PopoverTrigger asChild>
                                 <Button variant="outline" className={cn(
                                     "w-full justify-between font-normal bg-white border-slate-200 hover:bg-white h-10 px-3",
-                                    selectedCategories.length > 0 ? "bg-slate-100/50 text-slate-900 pr-9" : "text-slate-500"
+                                    filters.category.length > 0 ? "bg-slate-100/50 text-slate-900 pr-9" : "text-slate-500"
                                 )}>
-                                    <span className="truncate">{selectedCategories.length > 0 ? `${selectedCategories.length} Selected` : "Select"}</span>
+                                    <span className="truncate">{filters.category.length > 0 ? `${filters.category.length} Selected` : "Select"}</span>
                                     <ChevronDown className="h-4 w-4 opacity-50" />
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[200px] p-2" align="start">
-                                {selectedDept ? (
+                                {filters.department ? (
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between pb-1 border-b">
                                             <span className="text-[10px] font-bold text-slate-400 uppercase">Categories</span>
-                                            <button className="text-[10px] text-blue-600 hover:underline" onClick={() => { setTempCategories([]); setSelectedCategories([]); }}>Clear All</button>
+                                            <button className="text-[10px] text-blue-600 hover:underline" onClick={() => { setTempCategories([]); setFilters({ category: [] }); }}>Clear All</button>
                                         </div>
                                         <div className="max-h-[200px] overflow-y-auto space-y-2 py-1">
-                                            {(categoriesMap[selectedDept] || []).map((cat) => (
+                                            {(categoriesMap[filters.department] || []).map((cat) => (
                                                 <div key={cat} className="flex items-center gap-2 px-1">
                                                     <Checkbox id={cat} checked={tempCategories.includes(cat)} onCheckedChange={() => toggleCategory(cat)} />
                                                     <label htmlFor={cat} className="text-sm font-medium leading-none cursor-pointer select-none">{cat}</label>
@@ -482,9 +394,9 @@ export function CompliancesPageClient() {
                                 ) : <div className="text-sm text-slate-500 py-4 text-center">Select a department first</div>}
                             </PopoverContent>
                         </Popover>
-                        {selectedCategories.length > 0 && (
+                        {filters.category.length > 0 && (
                             <button
-                                onClick={(e) => { e.stopPropagation(); setSelectedCategories([]); setTempCategories([]); }}
+                                onClick={(e) => { e.stopPropagation(); setFilters({ category: [] }); setTempCategories([]); }}
                                 className="absolute right-8 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-200 rounded-full transition-colors z-20"
                                 title="Clear Categories"
                             >
@@ -522,8 +434,8 @@ export function CompliancesPageClient() {
                     <div className="space-y-1">
                         <label className="text-sm font-medium text-slate-700">Assigned Expert</label>
                         <div className="relative">
-                            <Select value={selectedExpert || "all"} onValueChange={setSelectedExpert}>
-                                <SelectTrigger className={cn("bg-white border-slate-200 min-h-10 pr-9", selectedExpert !== "all" ? "bg-slate-100/50" : "")}>
+                            <Select value={filters.assignedTo || "all"} onValueChange={(val) => setFilters({ assignedTo: val })}>
+                                <SelectTrigger className={cn("bg-white border-slate-200 min-h-10 pr-9", filters.assignedTo !== "all" ? "bg-slate-100/50" : "")}>
                                     <SelectValue placeholder="All Experts" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -534,9 +446,9 @@ export function CompliancesPageClient() {
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {selectedExpert !== "all" && (
+                            {filters.assignedTo !== "all" && (
                                 <button
-                                    onClick={(e) => { e.stopPropagation(); setSelectedExpert("all"); }}
+                                    onClick={(e) => { e.stopPropagation(); setFilters({ assignedTo: "all" }); }}
                                     className="absolute right-8 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-200 rounded-full transition-colors z-20"
                                     title="Clear Expert"
                                 >
@@ -566,10 +478,10 @@ export function CompliancesPageClient() {
                     {tabs.map(tab => (
                         <button
                             key={tab.name}
-                            onClick={() => setActiveTab(tab.name)}
+                            onClick={() => setFilters({ tab: tab.name })}
                             className={cn(
                                 "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                                activeTab === tab.name ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-700"
+                                filters.tab === tab.name ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500 hover:text-slate-700"
                             )}
                         >
                             {tab.name} <span className="text-xs text-slate-400 ml-1">({tab.count})</span>
@@ -606,7 +518,7 @@ export function CompliancesPageClient() {
                                 {isSuperAdmin && (
                                     <TableHead className="w-12">
                                         <Checkbox
-                                            checked={finalFilteredCompliances.length > 0 && selectedIds.length === finalFilteredCompliances.length}
+                                            checked={compliances.length > 0 && selectedIds.length === compliances.length}
                                             onCheckedChange={toggleSelectAll}
                                         />
                                     </TableHead>
@@ -622,11 +534,11 @@ export function CompliancesPageClient() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {finalFilteredCompliances.length === 0 ? (
+                            {compliances.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={9} className="text-center text-slate-400 py-10">No compliances found for the current filters.</TableCell>
                                 </TableRow>
-                            ) : finalFilteredCompliances.map((c: any) => (
+                            ) : compliances.map((c: any) => (
                                 <TableRow key={c._id || c.id} className={cn("hover:bg-slate-50 transition-colors", selectedIds.includes(c._id || c.id) ? "bg-blue-50/50" : "")}>
                                     {isSuperAdmin && (
                                         <TableCell>
@@ -640,71 +552,77 @@ export function CompliancesPageClient() {
                                         <div className="flex items-center gap-2">
                                             <span className="font-medium text-slate-800">{c.serviceType}</span>
                                             {(c.risk === "HIGH" || c.isMandatory) && (
-                                                <span className="bg-orange-500 text-white text-[10px] font-bold px-1 rounded-sm">M</span>
+                                                <span className="bg-orange-500 text-white text-[10px] font-bold px-1 rounded-sm" title="Mandatory Compliance">M</span>
+                                            )}
+                                            {c.service && (
+                                                <span className="flex items-center gap-1 bg-blue-50 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-blue-100" title={`Purchased via Service: ${c.service.title || 'N/A'}`}>
+                                                    <Briefcase className="h-2.5 w-2.5" />
+                                                    Service
+                                                </span>
                                             )}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-slate-600">{c.company?.name || "N/A"}</TableCell>
                                     <TableCell><span className="text-xs text-slate-800 font-medium">{c.expertName || "Unassigned"}</span></TableCell>
                                     <TableCell className="text-slate-600 font-medium">
-                                         <div className="flex flex-col">
-                                             <span>{new Date(c.dueDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
-                                             <span className="text-[10px] text-slate-400">Due Date</span>
-                                         </div>
-                                     </TableCell>
-                                     <TableCell>
-                                         <div className="flex flex-col gap-1">
-                                             <span className="font-bold text-slate-900">₹{c.price || 0}</span>
-                                             <div className="flex items-center gap-1.5">
-                                                 <Badge variant="outline" className={cn(
-                                                     "text-[9px] uppercase px-1.5 py-0 h-4 border-none font-bold",
-                                                     c.payment?.status === 'PAID' ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-600"
-                                                 )}>
-                                                     {c.payment?.status || 'PENDING'}
-                                                 </Badge>
-                                                 {c.payment?.status === 'PAID' && (
-                                                     <Popover>
-                                                         <PopoverTrigger asChild>
-                                                             <button className="text-slate-400 hover:text-slate-600"><Info className="h-3 w-3" /></button>
-                                                         </PopoverTrigger>
-                                                         <PopoverContent className="w-64 p-3" align="start">
-                                                             <div className="space-y-2">
-                                                                 <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
-                                                                     <CreditCard className="h-4 w-4 text-blue-600" />
-                                                                     <span className="text-sm font-bold">Payment Details</span>
-                                                                 </div>
-                                                                 <div className="grid grid-cols-2 gap-y-1.5 text-xs">
-                                                                     <span className="text-slate-500">Amount:</span>
-                                                                     <span className="font-medium">₹{c.payment?.amount || c.price}</span>
-                                                                     <span className="text-slate-500">Paid At:</span>
-                                                                     <span className="font-medium text-emerald-600">{c.payment?.paidAt ? new Date(c.payment.paidAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}</span>
-                                                                     <span className="text-slate-500">Order ID:</span>
-                                                                     <span className="font-mono text-[10px] truncate" title={c.payment?.razorpayOrderId}>{c.payment?.razorpayOrderId || 'N/A'}</span>
-                                                                     <span className="text-slate-500">Payment ID:</span>
-                                                                     <span className="font-mono text-[10px] truncate" title={c.payment?.razorpayPaymentId}>{c.payment?.razorpayPaymentId || 'N/A'}</span>
-                                                                 </div>
-                                                             </div>
-                                                         </PopoverContent>
-                                                     </Popover>
-                                                 )}
-                                             </div>
-                                         </div>
-                                     </TableCell>
-                                     <TableCell className="text-slate-600">
-                                         <div className="flex flex-col">
-                                             <span className="font-medium text-slate-800">{c.stage ? c.stage.charAt(0) + c.stage.slice(1).toLowerCase().replace('_', ' ') : ""}</span>
-                                             <span className="text-[10px] text-slate-400">Current Stage</span>
-                                         </div>
-                                     </TableCell>
-                                     <TableCell>
-                                         <span className={cn(
-                                             "text-[11px] font-semibold px-2 py-0.5 rounded whitespace-nowrap",
-                                             ["COMPLETED", "FILING_DONE"].includes(c.status) ? "bg-green-100 text-green-700" :
-                                                 ["DELAYED", "OVERDUE"].includes(c.status) ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
-                                         )}>
-                                             {formatComplianceStatus(c.status)}
-                                         </span>
-                                     </TableCell>
+                                        <div className="flex flex-col">
+                                            <span>{new Date(c.dueDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                                            <span className="text-[10px] text-slate-400">Due Date</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col gap-1">
+                                            <span className="font-bold text-slate-900">₹{c.price || 0}</span>
+                                            <div className="flex items-center gap-1.5">
+                                                <Badge variant="outline" className={cn(
+                                                    "text-[9px] uppercase px-1.5 py-0 h-4 border-none font-bold",
+                                                    c.payment?.status === 'PAID' ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-600"
+                                                )}>
+                                                    {c.payment?.status || 'PENDING'}
+                                                </Badge>
+                                                {c.payment?.status === 'PAID' && (
+                                                    <Popover>
+                                                        <PopoverTrigger asChild>
+                                                            <button className="text-slate-400 hover:text-slate-600"><Info className="h-3 w-3" /></button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-64 p-3" align="start">
+                                                            <div className="space-y-2">
+                                                                <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+                                                                    <CreditCard className="h-4 w-4 text-blue-600" />
+                                                                    <span className="text-sm font-bold">Payment Details</span>
+                                                                </div>
+                                                                <div className="grid grid-cols-2 gap-y-1.5 text-xs">
+                                                                    <span className="text-slate-500">Amount:</span>
+                                                                    <span className="font-medium">₹{c.payment?.amount || c.price}</span>
+                                                                    <span className="text-slate-500">Paid At:</span>
+                                                                    <span className="font-medium text-emerald-600">{c.payment?.paidAt ? new Date(c.payment.paidAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}</span>
+                                                                    <span className="text-slate-500">Order ID:</span>
+                                                                    <span className="font-mono text-[10px] truncate" title={c.payment?.razorpayOrderId}>{c.payment?.razorpayOrderId || 'N/A'}</span>
+                                                                    <span className="text-slate-500">Payment ID:</span>
+                                                                    <span className="font-mono text-[10px] truncate" title={c.payment?.razorpayPaymentId}>{c.payment?.razorpayPaymentId || 'N/A'}</span>
+                                                                </div>
+                                                            </div>
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-slate-600">
+                                        <div className="flex flex-col">
+                                            <span className="font-medium text-slate-800">{c.stage ? c.stage.charAt(0) + c.stage.slice(1).toLowerCase().replace('_', ' ') : ""}</span>
+                                            <span className="text-[10px] text-slate-400">Current Stage</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <span className={cn(
+                                            "text-[11px] font-semibold px-2 py-0.5 rounded whitespace-nowrap",
+                                            ["COMPLETED", "FILING_DONE"].includes(c.status) ? "bg-green-100 text-green-700" :
+                                                ["DELAYED", "OVERDUE"].includes(c.status) ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
+                                        )}>
+                                            {formatComplianceStatus(c.status)}
+                                        </span>
+                                    </TableCell>
                                     <TableCell>
                                         <Button
                                             variant="outline"
@@ -761,6 +679,7 @@ export function CompliancesPageClient() {
 
             {/* Legend */}
             <div className="flex items-center gap-4 text-xs text-slate-500">
+                <span className="flex items-center gap-1 text-blue-600 font-medium"><Briefcase className="h-3 w-3" /> Service Entity</span>
                 <span className="flex items-center gap-1"><span className="bg-purple-600 text-white text-[10px] font-bold px-1 rounded-sm">S</span> Scenario based</span>
                 <span className="flex items-center gap-1"><span className="bg-yellow-400 text-black text-[10px] font-bold px-1 rounded-sm">R</span> Recommended</span>
                 <span className="flex items-center gap-1"><span className="bg-orange-500 text-white text-[10px] font-bold px-1 rounded-sm">M</span> Mandatory</span>

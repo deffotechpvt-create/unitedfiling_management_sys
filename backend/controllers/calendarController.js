@@ -17,6 +17,8 @@ const normalizeStatusForFrontend = (status) => {
     'in_progress': 'pending',
     'needs_action': 'pending',
     'waiting_for_client': 'pending',
+    'payment_done': 'pending', // Still pending final filing
+    'filing_done': 'completed',
   };
   return STATUS_MAP[status] || 'pending';
 };
@@ -126,6 +128,8 @@ exports.updateEventStatus = asyncHandler(async (req, res) => {
     'needs_action',
     'waiting_for_client',
     'delayed',
+    'payment_done',
+    'filing_done',
   ];
 
   if (!status || !allowedStatuses.includes(status)) {

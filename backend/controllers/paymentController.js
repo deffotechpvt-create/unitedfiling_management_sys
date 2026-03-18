@@ -2,6 +2,8 @@ const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const Consultation = require('../models/Consultation');
 const Compliance = require('../models/Compliance');
+const Service = require('../models/Service');
+const Company = require('../models/Company');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
@@ -23,7 +25,7 @@ exports.createOrder = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Entity Type is required');
     }
 
-    if (!['CONSULTATION', 'COMPLIANCE'].includes(entityType)) {
+    if (!['CONSULTATION', 'COMPLIANCE', 'SERVICE'].includes(entityType)) {
         throw new ApiError(400, 'Invalid entity type');
     }
 
@@ -36,6 +38,11 @@ exports.createOrder = asyncHandler(async (req, res) => {
         if (!entityId) throw new ApiError(400, 'Compliance ID is required');
         const entity = await Compliance.findById(entityId);
         if (!entity) throw new ApiError(404, 'Compliance not found');
+        amount = entity.price || 0;
+    } else if (entityType === 'SERVICE') {
+        if (!entityId) throw new ApiError(400, 'Service ID is required');
+        const entity = await Service.findById(entityId);
+        if (!entity) throw new ApiError(404, 'Service not found');
         amount = entity.price || 0;
     }
 
@@ -84,7 +91,9 @@ exports.verifyPayment = asyncHandler(async (req, res) => {
         entityId,
         entityType,
         // Optional payload for consultations
-        consultationData
+        consultationData,
+        // Optional payload for services (must specify companyId)
+        companyId
     } = req.body;
 
     if (!entityId || !entityType) {
@@ -149,13 +158,14 @@ exports.verifyPayment = asyncHandler(async (req, res) => {
             await entity.save();
         }
 
+        await entity.save();
     } else if (entityType === 'COMPLIANCE') {
         entity = await Compliance.findById(entityId);
         if (!entity) throw new ApiError(404, 'Compliance not found');
         
         // Update payment info
         entity.payment = {
-            amount: entity.price, // ensure this is what they paid
+            amount: entity.price, 
             status: 'PAID',
             razorpayOrderId: razorpay_order_id,
             razorpayPaymentId: razorpay_payment_id,
@@ -163,9 +173,6 @@ exports.verifyPayment = asyncHandler(async (req, res) => {
             paidAt: Date.now()
         };
 
-        // User requested: "after payement success change the status also like payement to payement donot by client"
-        // And update the status and stage
-        // Update status and stage (only if it's a forward move)
         const nextStatus = constants.COMPLIANCE_STATUS.PAYMENT_DONE;
         const nextStage = constants.COMPLIANCE_STAGES.DOCUMENTATION;
 
@@ -176,10 +183,46 @@ exports.verifyPayment = asyncHandler(async (req, res) => {
             entity.stage = nextStage;
         }
         
-        // Add note indicating payment receipt
         entity.notes = entity.notes ? `${entity.notes}\n---\nPayment of ₹${entity.price} received successfully on ${new Date().toLocaleDateString()}.` : `Payment of ₹${entity.price} received successfully on ${new Date().toLocaleDateString()}.`;
 
         await entity.save();
+    } else if (entityType === 'SERVICE') {
+        const service = await Service.findById(entityId);
+        if (!service) throw new ApiError(404, 'Service not found');
+
+        if (!companyId) {
+            throw new ApiError(400, 'Company ID is required to purchase a service');
+        }
+
+        const company = await Company.findById(companyId).populate('client');
+        if (!company) throw new ApiError(404, 'Company not found');
+
+        // Find due date (default 1 month from now)
+        const dueDate = new Date();
+        dueDate.setMonth(dueDate.getMonth() + 1);
+
+        entity = await Compliance.create({
+            company: company._id,
+            client: company.client?._id,
+            service: service._id,
+            serviceType: service.serviceType || service.title,
+            category: service.category,
+            department: constants.DEPARTMENTS.OTHER,
+            price: service.price,
+            dueDate,
+            status: constants.COMPLIANCE_STATUS.PAYMENT_DONE,
+            stage: constants.COMPLIANCE_STAGES.DOCUMENTATION,
+            payment: {
+                amount: service.price,
+                status: 'PAID',
+                razorpayOrderId: razorpay_order_id,
+                razorpayPaymentId: razorpay_payment_id,
+                razorpaySignature: razorpay_signature,
+                paidAt: Date.now()
+            },
+            createdBy: req.user._id,
+            notes: `Service "${service.title}" purchased via automated flow.`
+        });
     }
 
     res.status(200).json(new ApiResponse(200, {

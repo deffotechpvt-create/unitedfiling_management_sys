@@ -32,6 +32,8 @@ export interface User {
   status: 'ACTIVE' | 'INACTIVE';
   avatarUrl?: string;
   onboardingTasks?: OnboardingTasks;
+  isOnboardingCompleted?: boolean;
+  onboardingData?: any;
 }
 
 export interface LoginCredentials {
@@ -62,9 +64,10 @@ export interface AuthContextType {
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (token: string, password: string) => Promise<void>;
   updateOnboardingTask: (task: keyof OnboardingTasks, completed?: boolean) => Promise<void>;
+  completeOnboarding: (data: any) => Promise<void>;
   isAuthenticated: boolean;
 }
-export type ComplianceStatus = 'PENDING' | 'DELAYED' | 'COMPLETED' | 'FILING_DONE';
+export type ComplianceStatus = 'PENDING' | 'NEEDS_ACTION' | 'IN_PROGRESS' | 'WAITING_FOR_CLIENT' | 'COMPLETED' | 'DELAYED' | 'OVERDUE' | 'FILING_DONE' | 'PAYMENT_DONE';
 export type ComplianceStage = 'PAYMENT' | 'DOCUMENTATION' | 'GOVT_APPROVAL' | 'FILING_DONE';
 
 export interface ComplianceRecord {
@@ -83,8 +86,8 @@ export interface Service {
   description: string;
   category: 'Licenses' | 'Trademarks' | 'Company Changes' | 'Taxation';
   price: string;
-  benefits: string[];
-  processSteps: { title: string; description: string }[];
+  benefits?: string[];
+  processSteps?: { title: string; description: string }[];
 }
 
 export interface Document {
@@ -202,7 +205,9 @@ export type CalendarEventStatus =
   | 'waiting_for_client'
   | 'completed'
   | 'delayed'
-  | 'overdue';
+  | 'overdue'
+  | 'payment_done'
+  | 'filing_done';
 
 export type CalendarServiceType =
   | 'GST'

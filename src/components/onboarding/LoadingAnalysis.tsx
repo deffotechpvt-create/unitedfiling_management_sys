@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { useOnboardingStore } from '@/store/useOnboardingStore';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/auth-context';
 
 
 export function LoadingAnalysis({ onComplete }: { onComplete?: () => void }) { 
@@ -18,6 +19,8 @@ export function LoadingAnalysis({ onComplete }: { onComplete?: () => void }) {
     const [isFinished, setIsFinished] = useState(false);
     const [complianceCount, setComplianceCount] = useState(0);
     const router = useRouter();
+    const { completeOnboarding } = useAuth();
+    const { data: onboardingData } = useOnboardingStore();
 
 
     const steps = [
@@ -76,10 +79,15 @@ export function LoadingAnalysis({ onComplete }: { onComplete?: () => void }) {
         }
     }, [isFinished]);
 
-    const handleGoToDashboard = () => {
-        useOnboardingStore.getState().completeOnboarding();
-        if (onComplete) onComplete(); 
-        router.push('/calendar');
+    const handleGoToDashboard = async () => {
+        try {
+            await completeOnboarding(onboardingData);
+            useOnboardingStore.getState().completeOnboarding();
+            if (onComplete) onComplete(); 
+            router.push('/calendar');
+        } catch (error) {
+            console.error("Failed to complete onboarding:", error);
+        }
     };
 
     return (

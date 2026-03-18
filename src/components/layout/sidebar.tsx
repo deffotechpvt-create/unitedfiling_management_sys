@@ -51,6 +51,7 @@ export function Sidebar() {
                     { name: "Compliances", href: "/compliances", icon: ShieldCheck },
                     { name: "Documents", href: "/documents", icon: FileText },
                     { name: "Consultations", href: "/consult", icon: HelpCircle },
+                    { name: "Manage Services", href: "/super-admin/services", icon: ShoppingBag },
                     { name: "Reports", href: "/reports", icon: FileText },
                 ]
             case ROLES.ADMIN:

@@ -20,6 +20,24 @@ export const calendarService = {
     return res.data;
   },
 
+  // GET /api/google/auth - Get Google OAuth URL or Sync if already connected
+  getGoogleAuthUrl: async (): Promise<{ url: string | null; synced?: boolean }> => {
+    const res = await api.get('/google/auth');
+    return res.data;
+  },
+
+  // GET /api/google/status - Check if already connected
+  getGoogleSyncStatus: async (): Promise<{ connected: boolean }> => {
+    const res = await api.get('/google/status');
+    return res.data;
+  },
+
+  // POST /api/google/disconnect - Revoke tokens and wipe synced events
+  disconnectGoogleCalendar: async (): Promise<{ message: string }> => {
+    const res = await api.post('/google/disconnect');
+    return res.data;
+  },
+
   // GET /api/calendar/upcoming — fetch upcoming deadlines (next N days)
   getUpcoming: async (days: number = 30): Promise<CalendarApiResponse> => {
     const res = await api.get(`/calendar/upcoming?days=${days}`);

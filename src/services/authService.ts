@@ -50,4 +50,10 @@ export const authService = {
     const { data } = await api.patch(`/auth/onboarding/${task}`, { completed });
     return data;
   },
+
+  // Complete onboarding
+  async completeOnboarding(onboardingData: any): Promise<{ success: boolean; user: User; message: string }> {
+    const { data } = await api.post('/auth/onboarding/complete', { data: onboardingData });
+    return data;
+  },
 };

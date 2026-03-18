@@ -134,7 +134,7 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
         try {
             await documentService.uploadDocument(data);
             toast.success("Uploaded");
-            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            window.dispatchEvent(new CustomEvent('app:sync-documents'));
             // Refresh to get actual doc with URL and ID
             fetchDocuments(true);
             return true;
@@ -154,7 +154,7 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
 
         try {
             await documentService.deleteDocument(id);
-            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            window.dispatchEvent(new CustomEvent('app:sync-documents'));
             toast.success("Deleted");
             // Background sync (doesn't trigger global loading if quiet)
             fetchFolders(true);
@@ -172,7 +172,7 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
 
         try {
             await documentService.updateDocument(id, data);
-            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            window.dispatchEvent(new CustomEvent('app:sync-documents'));
             toast.success("Updated");
             // Sync metadata in background
             fetchFolders(true);
@@ -195,15 +195,20 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
         refreshAll(false);
     }, [user?._id, isAuthenticated, selectedCompany?._id, refreshAll, pagination.page]);
 
-    // ✅ Listen for sync signals from other modules
     useEffect(() => {
-        const handleSync = () => {
+        const handleSync = (e: any) => {
             if (!isAuthenticated) return;
-            console.log("[Document] 🔄 Syncing data from broadcast...");
-            refreshAll(true);
+            if (e.type === 'app:sync-documents' || e.type === 'app:sync-data') {
+                console.log(`[Document] 🔄 Syncing data from broadcast (${e.type})...`);
+                refreshAll(true);
+            }
         };
         window.addEventListener('app:sync-data', handleSync);
-        return () => window.removeEventListener('app:sync-data', handleSync);
+        window.addEventListener('app:sync-documents', handleSync);
+        return () => {
+            window.removeEventListener('app:sync-data', handleSync);
+            window.removeEventListener('app:sync-documents', handleSync);
+        };
     }, [isAuthenticated, refreshAll]);
 
     return (

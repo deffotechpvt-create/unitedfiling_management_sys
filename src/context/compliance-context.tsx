@@ -28,14 +28,23 @@ interface ComplianceContextType {
     deleteTemplate: (id: string) => Promise<void>;
     deleteCompliances: (ids: string[]) => Promise<void>;
     exportAllCompliances: (filters?: any) => Promise<void>;
-    globalSearch: string;
-    setGlobalSearch: (value: string) => void;
     pagination: {
         currentPage: number;
         totalPages: number;
         totalDocs: number;
     };
     setPage: (page: number) => void;
+    filters: {
+        department: string | null;
+        category: string[];
+        search: string;
+        assignedTo: string;
+        tab: string;
+    };
+    setFilters: (filters: Partial<ComplianceContextType['filters']>) => void;
+    // For backward compatibility
+    globalSearch: string;
+    setGlobalSearch: (value: string) => void;
 }
 
 const ComplianceContext = createContext<ComplianceContextType | undefined>(undefined);
@@ -49,10 +58,16 @@ export function ComplianceProvider({ children }: { children: React.ReactNode }) 
     const [templates, setTemplates] = useState<ComplianceTemplate[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [globalSearch, setGlobalSearch] = useState("");
     const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalDocs: 0 });
+    const [filters, setFiltersState] = useState({
+        department: null as string | null,
+        category: [] as string[],
+        search: "",
+        assignedTo: "all",
+        tab: "All"
+    });
     const { user, isAuthenticated } = useAuth();
-    const { selectedCompany } = useCompany();
+    const { selectedCompany, loading: companyLoading } = useCompany();
 
     const lastFetchTime = useRef<{ compliances: number; stats: number; admins: number; templates: number }>({
         compliances: 0,
@@ -89,7 +104,7 @@ export function ComplianceProvider({ children }: { children: React.ReactNode }) 
         isFetching.current.compliances = true;
 
         // Only show global loading on first fetch
-        if (compliances.length === 0 && !lastFetchTime.current.compliances) {
+        if (!lastFetchTime.current.compliances) {
             setLoading(true);
         }
         setError(null);
@@ -110,7 +125,7 @@ export function ComplianceProvider({ children }: { children: React.ReactNode }) 
             setLoading(false);
             isFetching.current.compliances = false;
         }
-    }, [compliances.length]);
+    }, []); // Stable fetcher
 
     const fetchStats = useCallback(async (companyId?: string, force: boolean = false, filters: { department?: string; category?: string | string[]; search?: string; assignedTo?: string } = {}) => {
         const now = Date.now();
@@ -190,7 +205,7 @@ export function ComplianceProvider({ children }: { children: React.ReactNode }) 
 
         try {
             await complianceService.updateCompliance(id, data);
-            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            window.dispatchEvent(new CustomEvent('app:sync-compliance'));
             // Refetch quietly in background to ensure stats and data are synced
             fetchStats(lastCompanyId.current, true);
         } catch (err: any) {
@@ -226,7 +241,7 @@ export function ComplianceProvider({ children }: { children: React.ReactNode }) 
 
         try {
             await complianceService.addAttachment(id, url, name, note);
-            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            window.dispatchEvent(new CustomEvent('app:sync-compliance'));
             toast.success("Attachment added");
             // Background refresh to get server-verified state
             fetchStats(lastCompanyId.current, true);
@@ -237,13 +252,41 @@ export function ComplianceProvider({ children }: { children: React.ReactNode }) 
         }
     };
 
-    const refreshAll = useCallback(async (companyId?: string, force: boolean = false, filters: { department?: string; category?: string | string[]; search?: string; assignedTo?: string; page?: number; limit?: number } = {}) => {
-        // Allow companyId to be undefined for "All Companies" view
+    const refreshAll = useCallback(async (companyId?: string, force: boolean = false, overrideFilters: any = null) => {
+        const activeFilters = overrideFilters || {
+            department: filters.department,
+            category: filters.category,
+            search: filters.search,
+            assignedTo: filters.assignedTo,
+            tab: filters.tab,
+            page: pagination.currentPage,
+            limit: 5
+        };
+
         await Promise.all([
-            fetchCompliances(companyId, force, filters),
-            fetchStats(companyId, force, filters),
+            fetchCompliances(companyId, force, activeFilters),
+            fetchStats(companyId, force, activeFilters),
         ]);
-    }, [fetchCompliances, fetchStats]);
+    }, [fetchCompliances, fetchStats, filters, pagination.currentPage]);
+
+    // Handle auto-refresh when filters or pagination change
+    useEffect(() => {
+        if (!isAuthenticated || !user || companyLoading) return;
+
+        refreshAll(selectedCompany?._id, false);
+    }, [
+        isAuthenticated,
+        user?._id,
+        selectedCompany?._id,
+        companyLoading,
+        filters.department,
+        filters.category,
+        filters.search,
+        filters.assignedTo,
+        filters.tab,
+        pagination.currentPage,
+        refreshAll
+    ]);
 
     // Role-aware and company-aware initial loading
     useEffect(() => {
@@ -267,15 +310,21 @@ export function ComplianceProvider({ children }: { children: React.ReactNode }) 
         }
     }, [user?._id, user?.role, isAuthenticated]);
 
-    // ✅ Listen for sync signals from other modules
     useEffect(() => {
-        const handleSync = () => {
+        const handleSync = (e: any) => {
             if (!isAuthenticated) return;
-            console.log("[Compliance] 🔄 Syncing data from broadcast...");
-            refreshAll(lastCompanyId.current, true);
+            // Listen for specific compliance sync OR global sync
+            if (e.type === 'app:sync-compliance' || e.type === 'app:sync-data') {
+                console.log(`[Compliance] 🔄 Syncing data from broadcast (${e.type})...`);
+                refreshAll(lastCompanyId.current, true);
+            }
         };
         window.addEventListener('app:sync-data', handleSync);
-        return () => window.removeEventListener('app:sync-data', handleSync);
+        window.addEventListener('app:sync-compliance', handleSync);
+        return () => {
+            window.removeEventListener('app:sync-data', handleSync);
+            window.removeEventListener('app:sync-compliance', handleSync);
+        };
     }, [isAuthenticated, refreshAll]);
 
     const createTemplate = async (data: any) => {
@@ -326,7 +375,7 @@ export function ComplianceProvider({ children }: { children: React.ReactNode }) 
 
         try {
             await complianceService.deleteCompliances(ids);
-            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            window.dispatchEvent(new CustomEvent('app:sync-compliance'));
             toast.success("Deleted successfully");
             refreshAll(lastCompanyId.current, true);
         } catch (err: any) {
@@ -358,7 +407,22 @@ export function ComplianceProvider({ children }: { children: React.ReactNode }) 
         }
     };
 
-    const value: ComplianceContextType = {
+    const setPage = useCallback((page: number) => {
+        setPagination(prev => ({ ...prev, currentPage: page }));
+    }, []);
+
+    const setFilters = useCallback((newFilters: Partial<ComplianceContextType['filters']>) => {
+        setFiltersState(prev => ({ ...prev, ...newFilters }));
+        // Reset to page 1 on filter change
+        setPagination(prev => ({ ...prev, currentPage: 1 }));
+    }, []);
+
+    const setGlobalSearch = useCallback((search: string) => {
+        setFiltersState(prev => ({ ...prev, search }));
+        setPagination(prev => ({ ...prev, currentPage: 1 }));
+    }, []);
+
+    const value = React.useMemo(() => ({
         compliances,
         stats,
         admins,
@@ -376,16 +440,23 @@ export function ComplianceProvider({ children }: { children: React.ReactNode }) 
         updateTemplate: updateTemplateRecord,
         deleteTemplate,
         deleteCompliances,
-        globalSearch,
-        setGlobalSearch,
         exportAllCompliances,
         pagination,
-        setPage: (page: number) => {
-            setPagination(prev => ({ ...prev, currentPage: page }));
-        }
-    };
+        setPage,
+        filters,
+        setFilters,
+        globalSearch: filters.search,
+        setGlobalSearch
+    }), [
+        compliances, stats, admins, templates, loading, error,
+        fetchCompliances, fetchStats, fetchTemplates,
+        updateCompliance, addAttachment, fetchAdminsForAssignment,
+        refreshAll, createTemplate, updateTemplateRecord,
+        deleteTemplate, deleteCompliances, exportAllCompliances,
+        pagination, setPage, filters, setFilters, setGlobalSearch
+    ]);
 
-    return <ComplianceContext.Provider value={value as any}>{children}</ComplianceContext.Provider>;
+    return <ComplianceContext.Provider value={value}>{children}</ComplianceContext.Provider>;
 }
 
 export function useCompliance() {

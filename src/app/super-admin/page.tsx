@@ -12,12 +12,23 @@ import {
     TrendingUp,
     AlertCircle,
     Clock,
-    CreditCard
+    CreditCard,
+    Briefcase,
+    FileCheck2
 } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 
 export default function SuperAdminDashboard() {
-    const { admins = [], clients = [], serverStats } = useSuperAdmin();
-    const { consultations = [] } = useConsultation();
+    const { admins = [], clients = [], serverStats, dashboardStats } = useSuperAdmin();
+    // const { consultations = [] } = useConsultation();
 
     // Calculate Global Stats
     const totalAdmins = admins.length;
@@ -25,25 +36,9 @@ export default function SuperAdminDashboard() {
     const totalClients = clients.length;
     const totalPendingWork = clients.reduce((acc: number, curr: any) => acc + (curr.pendingWork || 0), 0);
 
-    // Calculate Revenue
-    const totalRevenue = consultations
-        .filter((c: any) => c.payment?.status === 'PAID')
-        .reduce((acc: number, c: any) => acc + (c.payment?.amount || 0), 0);
-
-    // Calculate Platform Health
-    const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const newClientsThisMonth = clients.filter((c: any) => {
-        const joinedDate = new Date(c.joinedDate || 0);
-        return joinedDate >= firstDayOfMonth;
-    }).length;
-
-    const consultationsThisMonth = consultations.filter((c: any) => {
-        if (c.payment?.status !== 'PAID' || !c.payment?.paidAt) return false;
-        const paidDate = new Date(c.payment.paidAt);
-        return paidDate >= firstDayOfMonth;
-    }).length;
+    // Platform Metrics
+    const newClientsThisMonth = dashboardStats?.newClientsThisMonth ?? 0;
+    const totalTransactionsThisMonth = dashboardStats?.totalTransactionsThisMonth ?? 0;
 
     const avgAdminUtilization = admins.length > 0
         ? Math.round(admins.reduce((acc: number, curr: any) => acc + (curr.utilizationPercentage || 0), 0) / admins.length)
@@ -75,12 +70,75 @@ export default function SuperAdminDashboard() {
             trend: totalPendingWork > 50 ? "High workload" : "Normal"
         },
         {
-            title: "Consultation Revenue",
-            value: `₹${totalRevenue.toLocaleString('en-IN')}`,
+            title: "Total Revenue",
+            value: `₹${(dashboardStats?.totalRevenue || 0).toLocaleString('en-IN')}`,
+            // subValue: `Summary`,
             icon: CreditCard,
             color: "text-emerald-600",
             bg: "bg-emerald-50",
-            trend: `${consultationsThisMonth} consultations this month`
+            trend: `${totalTransactionsThisMonth} orders this month`,
+            action: (
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50 gap-1 text-[10px] font-bold uppercase transition-all duration-200">
+                            Details
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <CreditCard className="h-5 w-5 text-emerald-600" />
+                                Revenue Breakdown
+                            </DialogTitle>
+                        </DialogHeader>
+                        <div className="py-6 space-y-6">
+                            <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                <div>
+                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Consultations</p>
+                                    <h4 className="text-xl font-bold text-slate-900 mt-1">₹{(dashboardStats?.consultationRevenue || 0).toLocaleString('en-IN')}</h4>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">{dashboardStats?.paidConsultationsThisMonth || 0} successful bookings</p>
+                                </div>
+                                <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                                     <TrendingUp className="h-5 w-5" />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                <div>
+                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Service Purchases</p>
+                                    <h4 className="text-xl font-bold text-slate-900 mt-1">₹{(dashboardStats?.serviceEntityRevenue || 0).toLocaleString('en-IN')}</h4>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">Purchased via Service Entities</p>
+                                </div>
+                                <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600">
+                                     <Briefcase className="h-5 w-5" />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                <div>
+                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Manual Compliances</p>
+                                    <h4 className="text-xl font-bold text-slate-900 mt-1">₹{(dashboardStats?.directComplianceRevenue || 0).toLocaleString('en-IN')}</h4>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">Directly created tasks</p>
+                                </div>
+                                <div className="h-10 w-10 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600">
+                                     <FileCheck2 className="h-5 w-5" />
+                                </div>
+                            </div>
+
+                            <Separator className="my-2" />
+
+                            <div className="flex justify-between items-center px-4 py-2">
+                                <span className="text-sm font-bold text-slate-600">Total Global Revenue</span>
+                                <span className="text-2xl font-black text-emerald-600">₹{(dashboardStats?.totalRevenue || 0).toLocaleString('en-IN')}</span>
+                            </div>
+
+                            <p className="text-[10.5px] text-slate-400 text-center italic">
+                                * Data reflects all verified payments on the platform.
+                            </p>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )
         },
     ];
 
@@ -112,6 +170,7 @@ export default function SuperAdminDashboard() {
                                         {stat.subValue && (
                                             <span className="text-xs text-slate-400">{stat.subValue}</span>
                                         )}
+                                        {stat.action && stat.action}
                                     </div>
                                     {stat.trend && (
                                         <p className="text-xs text-slate-500 flex items-center gap-1">

@@ -83,7 +83,8 @@ export function CreateComplianceDialog({ isOpen, onClose }: CreateComplianceDial
         try {
             await complianceService.createCompliance(formData);
             // ✅ Sync across all modules (Calendar, Dashboard, etc.)
-            window.dispatchEvent(new CustomEvent('app:sync-data'));
+            window.dispatchEvent(new CustomEvent('app:sync-compliance'));
+            window.dispatchEvent(new CustomEvent('app:sync-calendar'));
             toast.success("Compliance assigned successfully");
             fetchCompliances(selectedCompany?._id, true);
             fetchStats(selectedCompany?._id, true);

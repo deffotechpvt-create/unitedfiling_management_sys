@@ -10,6 +10,7 @@ router.use(protect);
 router.use(checkRole(constants.ROLES.SUPER_ADMIN));
 
 router.get('/overview', reportController.getReportOverview);
+router.get('/dashboard-stats', reportController.getDashboardStats);
 router.get('/high-risk', reportController.getHighRiskCompliances);
 
 module.exports = router;

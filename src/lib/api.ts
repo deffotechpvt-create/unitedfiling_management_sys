@@ -12,7 +12,7 @@ console.log("AXIOS BASE URL =", base);
 
 const api = axios.create({
     baseURL: getBaseURL(),
-    withCredentials: true, // REQUIRED for cookie auth
+    withCredentials: true,
     timeout: 30000,
     headers: {
         "Content-Type": "application/json",

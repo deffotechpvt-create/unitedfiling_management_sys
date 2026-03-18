@@ -46,6 +46,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const completeOnboarding = async (data: any) => {
+        try {
+            const response = await authService.completeOnboarding(data);
+            if (response.success && response.user) {
+                const u = response.user as any;
+                setUser({ ...u, _id: u._id || u.id });
+                toast.success("Onboarding completed successfully");
+            } else {
+                throw new Error("Failed to complete onboarding");
+            }
+        } catch (err: any) {
+            const errorMessage = err.response?.data?.message || err.message || "Something went wrong";
+            toast.error(errorMessage);
+            throw new Error(errorMessage);
+        }
+    };
+
     const login = async (credentials: LoginCredentials) => {
         try {
             setError(null);
@@ -198,6 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         forgotPassword,
         resetPassword,
         updateOnboardingTask: updateOnboardingTask as any,
+        completeOnboarding,
         isAuthenticated: !!user,
     };
 

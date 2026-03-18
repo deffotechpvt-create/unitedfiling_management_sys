@@ -6,25 +6,28 @@ import { useAuth } from "@/context/auth-context";
 import { CalendarEvent, CalendarEventStatus } from "@/types";
 import { CalendarSidebar } from "@/components/calendar/calendar-sidebar";
 import { CalendarGrid } from "@/components/calendar/calendar-grid";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useOnboardingStore } from "@/store/useOnboardingStore";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import { calendarService } from "@/services/calendarService";
 import { PlayCircle, AlertCircle, Loader2, Calendar as CalendarIcon, Clock, CheckCircle2 } from "lucide-react";
 import { canUpdateTaskStatus } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const STATUS_OPTIONS: { value: CalendarEventStatus; label: string; className: string }[] = [
-    { value: "pending", label: "Pending", className: "bg-blue-100 text-blue-700 border-blue-200" },
-    { value: "needs_action", label: "Needs Action", className: "bg-orange-100 text-orange-700 border-orange-200" },
-    { value: "in_progress", label: "In Progress", className: "bg-blue-100 text-blue-700 border-blue-200" },
-    { value: "waiting_for_client", label: "Waiting For Client", className: "bg-purple-100 text-purple-700 border-purple-200" },
-    { value: "completed", label: "Completed", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-    { value: "delayed", label: "Delayed", className: "bg-red-100 text-red-700 border-red-200" },
-    { value: "overdue", label: "Overdue", className: "bg-red-200 text-red-800 border-red-300" },
+    { value: "pending", label: "Pending", className: "bg-blue-50 text-blue-600 border-blue-100" },
+    { value: "needs_action", label: "Needs Action", className: "bg-orange-50 text-orange-600 border-orange-100" },
+    { value: "in_progress", label: "In Progress", className: "bg-blue-50 text-blue-600 border-blue-100" },
+    { value: "waiting_for_client", label: "Waiting For Client", className: "bg-purple-50 text-purple-600 border-purple-100" },
+    { value: "payment_done", label: "Payment Done", className: "bg-indigo-50 text-indigo-600 border-indigo-100" },
+    { value: "filing_done", label: "Filing Done", className: "bg-emerald-50 text-emerald-600 border-emerald-100" },
+    { value: "completed", label: "Completed", className: "bg-emerald-50 text-emerald-600 border-emerald-100" },
+    { value: "delayed", label: "Delayed", className: "bg-red-50 text-red-600 border-red-100" },
+    { value: "overdue", label: "Overdue", className: "bg-red-100 text-red-700 border-red-200" },
 ];
 
 function CalendarIntro() {
@@ -102,6 +105,8 @@ const STATUS_RANK: Record<string, number> = {
     'in_progress': 3,
     'needs_action': 2,
     'waiting_for_client': 4,
+    'payment_done': 4.5,
+    'filing_done': 5,
     'delayed': 0.5,
     'overdue': 0.5,
     'completed': 6
@@ -111,17 +116,74 @@ export default function CalendarPage() {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
     const { events, loading, error, updateEventStatus } = useCalendar();
-    const { user } = useAuth();
-    const { hasOnboarded } = useOnboardingStore();
+    const { user, loading: authLoading } = useAuth();
     const [mounted, setMounted] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [isGoogleConnected, setIsGoogleConnected] = useState(false);
+    const searchParams = useSearchParams();
 
     useEffect(() => {
         setMounted(true);
-    }, []);
+        // Handle Google OAuth callback redirect parameters
+        const googleSync = searchParams?.get('googleSync');
+        if (googleSync === 'success') {
+            toast.success("Successfully connected to Google Calendar");
+        } else if (googleSync === 'error') {
+            toast.error("Failed to connect to Google Calendar");
+        }
+        
+        // Fetch current connection status
+        calendarService.getGoogleSyncStatus().then(res => {
+            setIsGoogleConnected(res.connected);
+        }).catch(err => console.error("Failed to check Google Sync Status", err));
+    }, [searchParams]);
 
-    if (!mounted) return null;
+    const handleGoogleSync = async () => {
+        try {
+            setIsSyncing(true);
+            const response = await calendarService.getGoogleAuthUrl();
+            if (response.url) {
+                window.location.href = response.url;
+            } else if (response.synced) {
+                toast.success("Your Calendar events have been synced successfully!");
+                setIsGoogleConnected(true);
+            } else {
+                toast.error("Failed to generate Google Auth URL");
+            }
+        } catch (error) {
+            console.error("Error initiating Google Sync:", error);
+            toast.error("Failed to connect to Google Calendar");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
-    if (!hasOnboarded) {
+    const handleDisconnectGoogle = async () => {
+        try {
+            setIsSyncing(true);
+            const response = await calendarService.disconnectGoogleCalendar();
+            toast.success(response.message);
+            setIsGoogleConnected(false);
+        } catch (error) {
+            console.error("Error disconnecting Google Sync:", error);
+            toast.error("Failed to disconnect Google Calendar");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const isClient = user?.role === 'USER';
+    const isOnboarded = user?.isOnboardingCompleted;
+
+    if (!mounted || authLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Loader2 className="h-10 w-10 animate-spin text-slate-400" />
+            </div>
+        );
+    }
+
+    if (isClient && !isOnboarded) {
         return <CalendarIntro />;
     }
 
@@ -151,19 +213,25 @@ export default function CalendarPage() {
     const isAdmin = canUpdateTaskStatus(user?.role);
 
     return (
-        <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background">
-            <CalendarSidebar
-                events={events}
-                selectedDate={currentDate}
-                onSelectEvent={setSelectedEvent}
-            />
+        <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden bg-background">
+            <div className="flex flex-1 overflow-hidden">
+                <CalendarSidebar
+                    events={events}
+                    selectedDate={currentDate}
+                    onSelectEvent={setSelectedEvent}
+                />
 
-            <CalendarGrid
-                events={events}
-                currentDate={currentDate}
-                onDateChange={setCurrentDate}
-                onEventClick={setSelectedEvent}
-            />
+                <CalendarGrid
+                    googleSync={handleGoogleSync}
+                    synce={isSyncing}
+                    isGoogleConnected={isGoogleConnected}
+                    disconnectGoogle={handleDisconnectGoogle}
+                    events={events}
+                    currentDate={currentDate}
+                    onDateChange={setCurrentDate}
+                    onEventClick={setSelectedEvent}
+                />
+            </div>
 
             <Dialog open={!!selectedEvent} onOpenChange={(open) => !open && setSelectedEvent(null)}>
                 <DialogContent className="sm:max-w-md">
@@ -175,7 +243,7 @@ export default function CalendarPage() {
                                     {selectedEvent?.serviceType}
                                 </Badge>
                             </DialogTitle>
-                            
+
                             {isAdmin ? (
                                 <Select
                                     value={selectedEvent?.status}
@@ -194,6 +262,8 @@ export default function CalendarPage() {
                                         <SelectItem value="in_progress" disabled={!!(selectedEvent && STATUS_RANK['in_progress'] < STATUS_RANK[selectedEvent.status])}>In Progress</SelectItem>
                                         <SelectItem value="needs_action" disabled={!!(selectedEvent && STATUS_RANK['needs_action'] < STATUS_RANK[selectedEvent.status])}>Needs Action</SelectItem>
                                         <SelectItem value="waiting_for_client" disabled={!!(selectedEvent && STATUS_RANK['waiting_for_client'] < STATUS_RANK[selectedEvent.status])}>Waiting for Client</SelectItem>
+                                        <SelectItem value="payment_done" disabled={!!(selectedEvent && STATUS_RANK['payment_done'] < STATUS_RANK[selectedEvent.status])}>Payment Done</SelectItem>
+                                        <SelectItem value="filing_done" disabled={!!(selectedEvent && STATUS_RANK['filing_done'] < STATUS_RANK[selectedEvent.status])}>Filing Done</SelectItem>
                                         <SelectItem value="completed" disabled={!!(selectedEvent && STATUS_RANK['completed'] < STATUS_RANK[selectedEvent.status])}>Completed</SelectItem>
                                         <SelectItem value="delayed">Delayed</SelectItem>
                                         <SelectItem value="overdue">Overdue</SelectItem>
@@ -226,14 +296,14 @@ export default function CalendarPage() {
                                     {selectedEvent && format(new Date(selectedEvent.deadlineDate), "PPP")}
                                 </p>
                             </div>
-                            
+
                             <div className="space-y-1.5">
                                 <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
                                     <Clock className="h-3 w-3" /> Time Remaining
                                 </span>
-                                <p className={cn("font-semibold", 
+                                <p className={cn("font-semibold",
                                     (selectedEvent?.daysRemaining ?? 0) < 0 ? "text-red-600" :
-                                    (selectedEvent?.daysRemaining ?? 0) <= 7 ? "text-orange-600" : "text-emerald-600"
+                                        (selectedEvent?.daysRemaining ?? 0) <= 7 ? "text-orange-600" : "text-emerald-600"
                                 )}>
                                     {selectedEvent?.daysRemaining !== undefined
                                         ? selectedEvent.daysRemaining < 0
@@ -260,4 +330,3 @@ export default function CalendarPage() {
         </div>
     );
 }
-

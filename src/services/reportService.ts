@@ -21,7 +21,28 @@ export interface HighRiskCompliance {
     isNew?: boolean; // Virtual/Frontend flag
 }
 
+export interface DashboardStats {
+    summary: {
+        totalRevenue: number;
+        consultationRevenue: number;
+        serviceEntityRevenue: number;
+        directComplianceRevenue: number;
+        newClientsThisMonth: number;
+        paidConsultationsThisMonth: number;
+        paidCompliancesThisMonth: number;
+        totalTransactionsThisMonth: number;
+    }
+}
+
 export const reportService = {
+    /**
+     * Get dashboard metrics for super-admin
+     */
+    async getDashboardStats(): Promise<{ summary: DashboardStats['summary']; message: string }> {
+        const { data } = await api.get('/reports/dashboard-stats');
+        return data;
+    },
+
     /**
      * Get report overview statistics
      * Access: SUPER_ADMIN

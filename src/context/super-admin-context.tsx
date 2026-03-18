@@ -5,6 +5,7 @@ import { userService } from "@/services/userService";
 import { clientService } from "@/services/clientService";
 import { useAuth } from "./auth-context";
 import { useCompany } from "./company-context";
+import { reportService, DashboardStats } from "@/services/reportService";
 import { toast } from "sonner";
 import { isSuperAdmin } from "@/lib/roles";
 
@@ -45,6 +46,7 @@ interface SuperAdminContextType {
     admins: Admin[];
     clients: Client[];
     allUsers: any[];
+    dashboardStats: DashboardStats['summary'] | null;
     loading: boolean;
     error: string | null;
     refreshAdmins: (force?: boolean) => Promise<void>;
@@ -71,6 +73,7 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [serverStats, setServerStats] = useState<ServerStats | null>(null);
+    const [dashboardStats, setDashboardStats] = useState<DashboardStats['summary'] | null>(null);
 
     const lastFetchTime = useRef<{ admins: number, clients: number, users: number }>({ admins: 0, clients: 0, users: 0 });
     const isFetching = useRef<{ admins: boolean, clients: boolean, users: boolean }>({ admins: false, clients: false, users: false });
@@ -85,13 +88,27 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
         }
     };
 
+    const fetchDashboardStats = async () => {
+        try {
+            const response = await reportService.getDashboardStats();
+            setDashboardStats(response.summary);
+        } catch (error) {
+            console.error('Failed to fetch dashboard stats', error);
+        }
+    };
+
     useEffect(() => {
         if (!user || !isSuperAdmin(user.role)) {
             setServerStats(null);
+            setDashboardStats(null);
             return;
         }
         fetchServerStats();
-        const interval = setInterval(fetchServerStats, 60000);
+        fetchDashboardStats();
+        const interval = setInterval(() => {
+            fetchServerStats();
+            fetchDashboardStats();
+        }, 60000);
 
         return () => {
             clearInterval(interval);
@@ -409,6 +426,7 @@ export function SuperAdminProvider({ children }: { children: React.ReactNode }) 
                 admins,
                 clients,
                 allUsers,
+                dashboardStats,
                 loading,
                 error,
                 refreshAdmins,

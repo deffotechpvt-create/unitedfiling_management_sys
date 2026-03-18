@@ -10,7 +10,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { CheckCircle2, FileText, CreditCard } from "lucide-react"
-import { Service } from "@/types"
+import { Service } from "@/services/serviceService"
 
 interface ServiceSheetProps {
     service: Service | null
@@ -39,7 +39,7 @@ export function ServiceSheet({ service, open, onOpenChange }: ServiceSheetProps)
                     <TabsContent value="overview" className="space-y-4 mt-4">
                         <h3 className="font-semibold text-lg">Key Benefits</h3>
                         <ul className="space-y-3">
-                            {service.benefits.map((benefit, i) => (
+                            {service.benefits?.map((benefit, i) => (
                                 <li key={i} className="flex items-center gap-2">
                                     <CheckCircle2 className="h-5 w-5 text-green-500" />
                                     <span>{benefit}</span>
@@ -53,7 +53,7 @@ export function ServiceSheet({ service, open, onOpenChange }: ServiceSheetProps)
 
                     <TabsContent value="process" className="space-y-4 mt-4">
                         <div className="relative border-l border-slate-200 ml-3 space-y-6 pb-4">
-                            {service.processSteps.map((step, i) => (
+                            {service.processSteps?.map((step, i) => (
                                 <div key={i} className="relative pl-6">
                                     <div className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full border border-white bg-slate-300 ring-4 ring-white" />
                                     <h4 className="font-medium text-slate-900">{step.title}</h4>
@@ -78,7 +78,7 @@ export function ServiceSheet({ service, open, onOpenChange }: ServiceSheetProps)
                                 <span className="text-muted-foreground ml-1">/ entity</span>
                             </div>
                             <Button className="w-full" size="lg" asChild>
-                                <a href={`/services/${service.id}/checkout`}>
+                                <a href={`/services/${service.id || service._id}/checkout`}>
                                     Get Started <CreditCard className="ml-2 h-4 w-4" />
                                 </a>
                             </Button>

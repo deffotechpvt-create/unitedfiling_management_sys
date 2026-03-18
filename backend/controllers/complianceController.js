@@ -53,11 +53,7 @@ exports.getAllCompliances = asyncHandler(async (req, res) => {
             query.company = company;
         }
     } else if (role === constants.ROLES.ADMIN) {
-        const authorizedIds = await getAdminAuthorizedCompanyIds(userId);
-
-        // ADMIN sees strictly: 
-        // 1. Compliances explicitly assigned to them as Expert
-        // 2. Compliances they created
+        // ADMIN sees strictly their own tasks (assigned or created)
         const scopeFilter = {
             $or: [
                 { assignedTo: userId },
@@ -65,19 +61,14 @@ exports.getAllCompliances = asyncHandler(async (req, res) => {
             ]
         };
 
-        if (company) {
-            if (!authorizedIds.includes(company)) {
-                // If company is not theirs, still allow if they are assigned to a compliance in it
-                // We'll refine this to only that company
-                query.$and = [
-                    scopeFilter,
-                    { company: company }
-                ];
-            } else {
-                query.company = company;
-            }
+        if (company && mongoose.Types.ObjectId.isValid(company)) {
+            query.$and = [
+                scopeFilter,
+                { company: company }
+            ];
         } else {
-            Object.assign(query, scopeFilter);
+            // Use $and to ensure the scope filter isn't overwritten by subsequent search/status filters
+            query.$and = [scopeFilter];
         }
     } else if (role === constants.ROLES.USER) {
         const authorizedIds = await getUserAuthorizedCompanyIds(userId);
@@ -108,6 +99,41 @@ exports.getAllCompliances = asyncHandler(async (req, res) => {
     if (category) {
         query.category = Array.isArray(category) ? { $in: category } : category;
     }
+
+    // ── TAB-SPECIFIC FILTERS (from frontend) ─────────────────────────────────
+    const { tab } = req.query;
+    if (tab && tab !== "All") {
+        switch (tab) {
+            case "Pending":
+                query.status = constants.COMPLIANCE_STATUS.PENDING;
+                break;
+            case "Needs action":
+                query.status = constants.COMPLIANCE_STATUS.NEEDS_ACTION;
+                break;
+            case "In progress":
+                query.status = constants.COMPLIANCE_STATUS.IN_PROGRESS;
+                break;
+            case "Waiting For Client":
+                query.status = constants.COMPLIANCE_STATUS.WAITING_FOR_CLIENT;
+                break;
+            case "Payment":
+                query.status = constants.COMPLIANCE_STATUS.PAYMENT_DONE;
+                break;
+            case "Completed":
+                query.status = { $in: [constants.COMPLIANCE_STATUS.COMPLETED, constants.COMPLIANCE_STATUS.FILING_DONE] };
+                break;
+            case "Delayed":
+                query.status = constants.COMPLIANCE_STATUS.DELAYED;
+                break;
+            case "Overdue":
+                query.status = constants.COMPLIANCE_STATUS.OVERDUE;
+                break;
+            case "Service":
+                query.service = { $exists: true, $ne: null };
+                break;
+        }
+    }
+
     if (search || req.query.search) {
         const searchRegex = new RegExp(search || req.query.search, 'i');
         query.$or = [
@@ -128,6 +154,7 @@ exports.getAllCompliances = asyncHandler(async (req, res) => {
         .populate('company', 'name')
         .populate('client', 'name companyName')
         .populate('assignedTo', 'name email')
+        .populate('service', 'title')
         .select('-notes -__v')
         .sort({ dueDate: 1 });
 
@@ -162,7 +189,7 @@ exports.exportCompliances = asyncHandler(async (req, res) => {
             query.company = company;
         }
     } else if (role === constants.ROLES.ADMIN) {
-        const authorizedIds = await getAdminAuthorizedCompanyIds(userId);
+        // ADMIN sees strictly their own tasks during export
         const scopeFilter = {
             $or: [
                 { assignedTo: userId },
@@ -170,13 +197,13 @@ exports.exportCompliances = asyncHandler(async (req, res) => {
             ]
         };
 
-        if (company) {
-            if (!authorizedIds.includes(company)) {
-                throw new ApiError(403, 'Unauthorized company export');
-            }
-            query.company = company;
+        if (company && mongoose.Types.ObjectId.isValid(company)) {
+            query.$and = [
+                scopeFilter,
+                { company: company }
+            ];
         } else {
-            Object.assign(query, scopeFilter);
+            query.$and = [scopeFilter];
         }
     } else {
         throw new ApiError(403, 'Access denied');
@@ -263,41 +290,35 @@ exports.getComplianceStats = asyncHandler(async (req, res) => {
             query.company = new mongoose.Types.ObjectId(company);
         }
     } else if (role === constants.ROLES.ADMIN) {
-        const authorizedIds = await getAdminAuthorizedCompanyIds(userId);
+        // ADMIN stats strictly for their own tasks (assigned or created)
+        const adminId = new mongoose.Types.ObjectId(userId);
         const scopeFilter = {
             $or: [
-                { assignedTo: userId },
-                { createdBy: userId }
+                { assignedTo: adminId },
+                { createdBy: adminId }
             ]
         };
 
-        if (company) {
-            if (!authorizedIds.includes(company)) {
-                return res.status(200).json(new ApiResponse(200, {
-                    stats: { total: 0, pending: 0, delayed: 0, inProgress: 0, completed: 0, upcoming: 0 },
-                    message: 'Compliance statistics retrieved successfully'
-                }));
-            }
+        if (company && mongoose.Types.ObjectId.isValid(company)) {
             query.$and = [
-                { company: new mongoose.Types.ObjectId(company) },
-                scopeFilter
+                scopeFilter,
+                { company: new mongoose.Types.ObjectId(company) }
             ];
         } else {
-            query.$and = [
-                { company: { $in: authorizedIds.map(id => new mongoose.Types.ObjectId(id)) } },
-                scopeFilter
-            ];
+            query.$and = [scopeFilter];
         }
     } else if (role === constants.ROLES.USER) {
-        const authorizedIds = await getUserAuthorizedCompanyIds(userId);
+        let authorizedIds = await getUserAuthorizedCompanyIds(userId);
+        authorizedIds = authorizedIds.map(id => new mongoose.Types.ObjectId(id));
 
         if (company) {
-            if (!authorizedIds.includes(company)) {
+            const companyId = new mongoose.Types.ObjectId(company);
+            if (!authorizedIds.some(id => id.equals(companyId))) {
                 throw new ApiError(403, 'You do not have access to this company\'s statistics');
             }
-            query.company = new mongoose.Types.ObjectId(company);
+            query.company = companyId;
         } else {
-            query.company = { $in: authorizedIds.map(id => new mongoose.Types.ObjectId(id)) };
+            query.company = { $in: authorizedIds };
         }
     } else {
         throw new ApiError(403, 'Access denied');
@@ -351,6 +372,9 @@ exports.getComplianceStats = asyncHandler(async (req, res) => {
                 overdue: {
                     $sum: { $cond: [{ $eq: ['$status', constants.COMPLIANCE_STATUS.OVERDUE] }, 1, 0] }
                 },
+                paymentDone: {
+                    $sum: { $cond: [{ $eq: ['$status', constants.COMPLIANCE_STATUS.PAYMENT_DONE] }, 1, 0] }
+                },
                 upcoming: {
                     $sum: {
                         $cond: [
@@ -362,6 +386,9 @@ exports.getComplianceStats = asyncHandler(async (req, res) => {
                             }, 1, 0
                         ]
                     }
+                },
+                serviceRaw: {
+                    $sum: { $cond: [{ $gt: ['$service', null] }, 1, 0] }
                 }
             }
         },
@@ -376,7 +403,9 @@ exports.getComplianceStats = asyncHandler(async (req, res) => {
                 completed: { $add: ['$completedRaw', '$filingDone'] },
                 delayed: 1,
                 overdue: 1,
-                upcoming: 1
+                upcoming: 1,
+                paymentDone: 1,
+                service: '$serviceRaw'
             }
         }
     ]);
@@ -390,7 +419,9 @@ exports.getComplianceStats = asyncHandler(async (req, res) => {
         completed: 0,
         delayed: 0,
         overdue: 0,
-        upcoming: 0
+        upcoming: 0,
+        paymentDone: 0,
+        service: 0
     };
 
     res.status(200).json(new ApiResponse(200, {
@@ -430,12 +461,6 @@ exports.updateCompliance = asyncHandler(async (req, res) => {
 
     // ── ADMIN SCOPE CHECK ─────────────────────────────────────────────────────
     if (role === constants.ROLES.ADMIN) {
-        // Verify this compliance belongs to a company of one of the admin's assigned clients
-        const authorizedIds = await getAdminAuthorizedCompanyIds(userId);
-        if (!authorizedIds.includes(compliance.company._id.toString())) {
-            throw new ApiError(403, 'You do not have permission to update this compliance. It belongs to a company outside your assigned clients.');
-        }
-
         // Strictly check for Expert or Creator responsibility
         const isAssignee = compliance.assignedTo?.toString() === userId.toString();
         const isCreator = compliance.createdBy?.toString() === userId.toString();
@@ -777,19 +802,6 @@ exports.addAttachment = asyncHandler(async (req, res) => {
             throw new ApiError(403, 'You do not have access to this compliance');
         }
     } else if (role === constants.ROLES.ADMIN) {
-        // ADMIN can only act on companies belonging to their assigned clients
-        // FIX: Guard against null client (compliance without linked client)
-        if (!compliance.client) {
-            throw new ApiError(500, 'Compliance is not linked to a client — contact SUPER_ADMIN');
-        }
-        const client = await Client.findById(compliance.client);
-        if (!client) {
-            throw new ApiError(404, 'Client linked to this compliance was not found');
-        }
-        if (!client.assignedAdmin || client.assignedAdmin.toString() !== userId.toString()) {
-            throw new ApiError(403, 'You do not have access to this compliance');
-        }
-
         // Strictly check for Expert or Creator responsibility
         const isAssignee = compliance.assignedTo?.toString() === userId.toString();
         const isCreator = compliance.createdBy?.toString() === userId.toString();

@@ -12,7 +12,8 @@ export interface VerifyPaymentData {
     razorpay_payment_id: string;
     razorpay_signature: string;
     entityId: string;
-    entityType: 'CONSULTATION' | 'COMPLIANCE';
+    entityType: 'CONSULTATION' | 'COMPLIANCE' | 'SERVICE';
+    companyId?: string; // Needed for SERVICE purchases
     consultationData?: any; // Only needed if creating a new consultation
 }
 
@@ -20,7 +21,7 @@ export const paymentService = {
     /**
      * Create a Razorpay order from the backend
      */
-    async createOrder(entityId: string, entityType: 'CONSULTATION' | 'COMPLIANCE'): Promise<PaymentOrderResponse> {
+    async createOrder(entityId: string, entityType: 'CONSULTATION' | 'COMPLIANCE' | 'SERVICE'): Promise<PaymentOrderResponse> {
         const { data: response } = await api.post('/payments/create-order', { entityId, entityType });
         return response as any;
     },
@@ -30,6 +31,6 @@ export const paymentService = {
      */
     async verifyPayment(data: VerifyPaymentData): Promise<{ message: string; entity: any }> {
         const { data: response } = await api.post(`/payments/verify-payment`, data);
-        return response as any;
+        return response.data as any;
     }
 };

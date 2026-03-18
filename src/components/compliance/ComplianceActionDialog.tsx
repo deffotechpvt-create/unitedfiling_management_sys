@@ -164,8 +164,8 @@ export function ComplianceActionDialog({ compliance, isOpen, onClose }: Complian
                         });
 
                         toast.success("Payment successful! Compliance updated.", { id: loadingToastId });
-                        window.dispatchEvent(new CustomEvent('app:sync-data')); // global sync
-                        await refreshAll(undefined, true); // force list refresh
+                        window.dispatchEvent(new CustomEvent('app:sync-compliance')); 
+                        window.dispatchEvent(new CustomEvent('app:sync-calendar'));
                     } catch (err: any) {
                         console.error("Payment Verification Failed:", err);
                         toast.error(err.response?.data?.message || "Payment verification failed.");
@@ -242,7 +242,25 @@ export function ComplianceActionDialog({ compliance, isOpen, onClose }: Complian
 
     return (
         <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent 
+                className="max-w-2xl"
+                onInteractOutside={(e) => {
+                    if (isProcessingPayment) e.preventDefault();
+                }}
+            >
+                {/* 
+                   FIX: Razorpay injects an iframe at the end of the body. 
+                   Radix Dialog adds 'pointer-events: none' to the body which freezes Razorpay.
+                   This override allows interaction with Razorpay while the dialog remains open.
+                */}
+                {isProcessingPayment && (
+                    <style dangerouslySetInnerHTML={{ __html: `
+                        body { 
+                            pointer-events: auto !important; 
+                            user-select: auto !important;
+                        }
+                    ` }} />
+                )}
                 <DialogHeader>
                     <div className="flex items-center justify-between">
                         <DialogTitle className="text-xl font-bold flex items-center gap-2">

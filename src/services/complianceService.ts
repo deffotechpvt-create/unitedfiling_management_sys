@@ -18,6 +18,7 @@ export interface Compliance {
     risk: string;
     attachments: (string | { name: string; url: string })[];
     assignedTo?: string | { _id: string; name: string } | null;
+    service?: { _id: string; title: string };
 }
 
 export interface ComplianceStats {
@@ -31,6 +32,8 @@ export interface ComplianceStats {
     overdue: number;
     upcoming: number;
     cancelled: number;
+    paymentDone: number;
+    service: number;
 }
 
 export interface ComplianceTemplate {

@@ -1,5 +1,8 @@
 const Compliance = require('../models/Compliance');
 const Company = require('../models/Company');
+const Consultation = require('../models/Consultation');
+const Client = require('../models/Client');
+const User = require('../models/User');
 const ApiResponse = require('../utils/ApiResponse');
 const asyncHandler = require('../utils/asyncHandler');
 const constants = require('../config/constants');
@@ -97,7 +100,74 @@ const getHighRiskCompliances = asyncHandler(async (req, res) => {
     );
 });
 
+/**
+ * @desc    Get dashboard metrics for super-admin (revenue etc)
+ * @route   GET /api/reports/dashboard-stats
+ * @access  Private (SUPER_ADMIN only)
+ */
+const getDashboardStats = asyncHandler(async (req, res) => {
+    // 1. Consultation Revenue (PAID)
+    const consultationRevenue = await Consultation.aggregate([
+        { $match: { 'payment.status': 'PAID' } },
+        { $group: { _id: null, total: { $sum: '$payment.amount' } } }
+    ]);
+
+    // 2. Compliance Revenue (PAID) - Broken down into Direct vs Service-based
+    const serviceRevenue = await Compliance.aggregate([
+        { $match: { 'payment.status': 'PAID', 'service': { $exists: true, $ne: null } } },
+        { $group: { _id: null, total: { $sum: '$payment.amount' }, count: { $sum: 1 } } }
+    ]);
+
+    const directRevenue = await Compliance.aggregate([
+        { 
+            $match: { 
+                'payment.status': 'PAID', 
+                $or: [
+                    { 'service': { $exists: false } },
+                    { 'service': null }
+                ]
+            } 
+        },
+        { $group: { _id: null, total: { $sum: '$payment.amount' }, count: { $sum: 1 } } }
+    ]);
+
+    const consultTotal = consultationRevenue.length > 0 ? consultationRevenue[0].total : 0;
+    const servTotal = serviceRevenue.length > 0 ? serviceRevenue[0].total : 0;
+    const dirTotal = directRevenue.length > 0 ? directRevenue[0].total : 0;
+
+    // 3. Current Month Stats
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const newClientsMonth = await Client.countDocuments({ createdAt: { $gte: firstDayOfMonth } });
+    const consultsMonth = await Consultation.countDocuments({ 
+        'payment.status': 'PAID',
+        'payment.paidAt': { $gte: firstDayOfMonth } 
+    });
+    const compliancesMonth = await Compliance.countDocuments({
+        'payment.status': 'PAID',
+        'payment.paidAt': { $gte: firstDayOfMonth }
+    });
+
+    res.status(200).json(
+        new ApiResponse(200, {
+            summary: {
+                totalRevenue: consultTotal + servTotal + dirTotal,
+                consultationRevenue: consultTotal,
+                serviceEntityRevenue: servTotal,
+                directComplianceRevenue: dirTotal,
+                newClientsThisMonth: newClientsMonth,
+                paidConsultationsThisMonth: consultsMonth,
+                paidCompliancesThisMonth: compliancesMonth,
+                totalTransactionsThisMonth: consultsMonth + compliancesMonth
+            },
+            message: 'Dashboard stats retrieved successfully'
+        })
+    );
+});
+
 module.exports = {
     getReportOverview,
-    getHighRiskCompliances
+    getHighRiskCompliances,
+    getDashboardStats
 };

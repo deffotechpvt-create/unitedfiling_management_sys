@@ -113,7 +113,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
             try {
                 setError(null);
                 await calendarService.updateStatus(id, status);
-                window.dispatchEvent(new CustomEvent('app:sync-data'));
+                window.dispatchEvent(new CustomEvent('app:sync-calendar'));
                 toast.success(`Updated to ${status}`);
             } catch (err: any) {
                 setEvents(previousEvents);
@@ -139,20 +139,25 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
         }
     }, [user, fetchEvents, fetchAdminEvents, fetchUpcoming]);
     
-    // ✅ Listen for sync signals from other modules
     useEffect(() => {
-        const handleSync = () => {
+        const handleSync = (e: any) => {
             if (!user) return;
-            console.log("[Calendar] 🔄 Syncing data from broadcast...");
-            if (user.role === "USER") {
-                fetchEvents({ year: new Date().getFullYear() });
-                fetchUpcoming(30);
-            } else {
-                fetchAdminEvents({ year: new Date().getFullYear() });
+            if (e.type === 'app:sync-calendar' || e.type === 'app:sync-data') {
+                console.log(`[Calendar] 🔄 Syncing data from broadcast (${e.type})...`);
+                if (user.role === "USER") {
+                    fetchEvents({ year: new Date().getFullYear() });
+                    fetchUpcoming(30);
+                } else {
+                    fetchAdminEvents({ year: new Date().getFullYear() });
+                }
             }
         };
         window.addEventListener('app:sync-data', handleSync);
-        return () => window.removeEventListener('app:sync-data', handleSync);
+        window.addEventListener('app:sync-calendar', handleSync);
+        return () => {
+            window.removeEventListener('app:sync-data', handleSync);
+            window.removeEventListener('app:sync-calendar', handleSync);
+        };
     }, [user, fetchEvents, fetchAdminEvents, fetchUpcoming]);
 
 

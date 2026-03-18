@@ -56,8 +56,14 @@ const CalendarEventSchema = new mongoose.Schema({
   // Status — expanded to match compliance statuses
   status: {
     type: String,
-    enum: ['pending', 'completed', 'overdue', 'in_progress', 'needs_action', 'waiting_for_client', 'delayed'],
+    enum: ['pending', 'completed', 'overdue', 'in_progress', 'needs_action', 'waiting_for_client', 'delayed', 'payment_done', 'filing_done'],
     default: 'pending',
+  },
+
+  // ✅ Stage — syncs with compliance stage (PAYMENT, DOCUMENTATION, etc.)
+  stage: {
+    type: String,
+    default: null,
   },
 
   // Audit
@@ -71,6 +77,12 @@ const CalendarEventSchema = new mongoose.Schema({
     ref: 'User',
     default: null,
   },
+
+  // Tracks which users have synced this event and the resulting Google Event ID
+  googleSyncHistory: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    googleEventId: { type: String }
+  }],
 
   // ✅ Internal flag to prevent infinite loop between hooks
   _syncedFromCompliance: {
@@ -113,6 +125,9 @@ CalendarEventSchema.pre('save', function (next) {
   // ✅ Capture isNew before save so post('save') can use it
   this.wasNew = this.isNew;
 
+  // Track if core details modified to trigger Google update later
+  this._isModifiedForGoogle = this.isModified('title') || this.isModified('deadlineDate') || this.isModified('status') || this.isModified('serviceType') || this.isModified('stage');
+
   // ✅ Capture sync flag and reset it for DB persistence
   this._isSyncing = this._syncedFromCompliance;
   this._syncedFromCompliance = false; 
@@ -133,6 +148,32 @@ CalendarEventSchema.pre('save', function (next) {
     this.completedDate = null;
   }
 
+  next();
+});
+
+// ─────────────────────────────────────────
+// Pre-Delete: Auto-cleanup from Google Calendar
+// ─────────────────────────────────────────
+CalendarEventSchema.pre(['deleteOne', 'findOneAndDelete', 'deleteMany'], async function (next) {
+  try {
+    const model = this.model || this.constructor;
+    const filter = this.getFilter ? this.getFilter() : { _id: this._id };
+    
+    console.log(`[Google Sync Cleanup] Pre-delete hook triggered. Filter:`, JSON.stringify(filter));
+    
+    const docs = await model.find(filter);
+    console.log(`[Google Sync Cleanup] Found ${docs.length} events matching deletion criteria.`);
+    
+    if (docs && docs.length > 0) {
+      const { removeEventsFromGoogle } = require('../utils/googleCalendarHelpers');
+      // Fire and forget, don't block DB deletion
+      removeEventsFromGoogle(docs).then(() => {
+        console.log(`[Google Sync Cleanup] Background deletion dispatched successfully.`);
+      }).catch(err => console.error("[Google Sync Cleanup] Dispatch failed:", err));
+    }
+  } catch (err) {
+    console.error('[Sync] ❌ Pre-delete hook failed:', err.message);
+  }
   next();
 });
 
@@ -165,6 +206,8 @@ CalendarEventSchema.post('save', async function (doc) {
       'in_progress': constants.COMPLIANCE_STATUS.IN_PROGRESS,
       'needs_action': constants.COMPLIANCE_STATUS.NEEDS_ACTION,
       'waiting_for_client': constants.COMPLIANCE_STATUS.WAITING_FOR_CLIENT,
+      'payment_done': constants.COMPLIANCE_STATUS.PAYMENT_DONE,
+      'filing_done': constants.COMPLIANCE_STATUS.FILING_DONE,
     };
 
     const newComplianceStatus = STATUS_MAP[doc.status];
@@ -183,6 +226,25 @@ CalendarEventSchema.post('save', async function (doc) {
     console.log(`[Sync] ✅ Compliance "${compliance.serviceType}" status → ${newComplianceStatus}`);
   } catch (err) {
     console.error('[Sync] ❌ Calendar → Compliance sync failed:', err.message);
+  }
+});
+
+// ─────────────────────────────────────────
+// Post-save: Auto Update & Instant Sync for Google Calendar
+// ─────────────────────────────────────────
+CalendarEventSchema.post('save', async function (doc) {
+  try {
+    const { updateEventInGoogle, insertEventInGoogle } = require('../utils/googleCalendarHelpers');
+    
+    if (doc.wasNew) {
+      // It's a brand new event, dispatch an instant insert to connected Google accounts!
+      insertEventInGoogle(doc).catch(err => console.error("Google Calendar instant insert failed:", err));
+    } else if (doc._isModifiedForGoogle && doc.googleSyncHistory && doc.googleSyncHistory.length > 0) {
+      // Existing event modified, dispatch a patch update
+      updateEventInGoogle(doc).catch(err => console.error("Google Calendar patch failed:", err));
+    }
+  } catch (err) {
+     console.error('[Sync] ❌ Post-save Google Patch/Insert failed:', err.message);
   }
 });
 
