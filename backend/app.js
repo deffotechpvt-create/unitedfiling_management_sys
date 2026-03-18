@@ -15,8 +15,10 @@ const errorHandlerMiddleware = require('./middleware/errorHandlerMiddleware');
 
 const app = express();
 
-// Trust proxy for Render/Vercel (required for Secure cookies)
-app.set('trust proxy', 1);
+// Trust proxy to get correct IP behind Nginx/Heroku
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
 
 // ======================
 // Security Middleware
@@ -32,7 +34,7 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
       callback(null, true);
     } else {

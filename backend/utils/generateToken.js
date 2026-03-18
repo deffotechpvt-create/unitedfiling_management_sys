@@ -26,23 +26,20 @@ const setTokenCookie = (res, token) => {
   res.cookie('token', token, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? 'none' : 'strict', // ✅ THIS is the only fix
+    sameSite: isProduction ? 'none' : 'lax', // ✅ THIS is the only fix
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: '/',
   });
 };
 
 const clearTokenCookie = (res) => {
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'PRODUCTION' || process.env.NODE_ENV === 'prod';
-
   res.cookie('token', '', {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'strict', // ✅ must match above
     expires: new Date(0),
     path: '/',
   });
 };
+
 
 
 module.exports = { generateToken, setTokenCookie, clearTokenCookie };
