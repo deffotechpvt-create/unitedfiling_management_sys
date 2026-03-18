@@ -139,10 +139,20 @@ exports.googleAuthCallback = async (req, res) => {
         // Auto-sync their events now that they are connected for the first time
         await syncUserEventsToGoogle(user, oauth2Client);
 
-        res.redirect(`${'http://localhost:3000'}/calendar?googleSync=success`);
+        let redirectUrl = 'http://localhost:3000';
+        if (process.env.NODE_ENV === 'production' && process.env.FRONTEND_URL) {
+            redirectUrl = process.env.FRONTEND_URL;
+        }
+
+        res.redirect(`${redirectUrl}/calendar?googleSync=success`);
     } catch (error) {
         console.error('Google Auth Callback Error:', error);
-        res.redirect(`${'http://localhost:3000'}/calendar?googleSync=error`);
+        let redirectUrl = 'http://localhost:3000';
+        if (process.env.NODE_ENV === 'production' && process.env.FRONTEND_URL) {
+            redirectUrl = process.env.FRONTEND_URL;
+        }
+
+        res.redirect(`${redirectUrl}/calendar?googleSync=error`);
     }
 };
 
