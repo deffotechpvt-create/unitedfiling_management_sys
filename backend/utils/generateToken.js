@@ -21,7 +21,7 @@ const generateToken = (userId, role) => {
 };
 
 const setTokenCookie = (res, token) => {
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'PRODUCTION' || process.env.NODE_ENV === 'prod';
 
   res.cookie('token', token, {
     httpOnly: true,
@@ -33,7 +33,7 @@ const setTokenCookie = (res, token) => {
 };
 
 const clearTokenCookie = (res) => {
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'PRODUCTION' || process.env.NODE_ENV === 'prod';
 
   res.cookie('token', '', {
     httpOnly: true,

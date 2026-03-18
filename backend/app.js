@@ -15,6 +15,9 @@ const errorHandlerMiddleware = require('./middleware/errorHandlerMiddleware');
 
 const app = express();
 
+// Trust proxy for Render/Vercel (required for Secure cookies)
+app.set('trust proxy', 1);
+
 // ======================
 // Security Middleware
 // ======================
