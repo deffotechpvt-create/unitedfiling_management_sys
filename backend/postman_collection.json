@@ -1551,6 +1551,212 @@
         { "name": "Update Document", "request": { "method": "PATCH", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"name\": \"New Name\",\n  \"folder\": \"Finance\",\n  \"description\": \"Updated\"\n}"}, "url": { "raw": "{{baseUrl}}/api/documents/:id", "host": ["{{baseUrl}}"], "path": ["api","documents",":id"], "variable": [{"key":"id","value":"","description":"Document ID"}] } }, "response": [] },
         { "name": "Delete Document", "request": { "method": "DELETE", "header": [], "url": { "raw": "{{baseUrl}}/api/documents/:id", "host": ["{{baseUrl}}"], "path": ["api","documents",":id"], "variable": [{"key":"id","value":"","description":"Document ID"}] } }, "response": [] }
       ]
+    },
+    {
+      "name": "Phase 2.8 - Calendar Management",
+      "item": [
+        {
+          "name": "Get Client Calendar",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/calendar?status=&serviceType=&year=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "calendar"],
+              "query": [
+                { "key": "status", "value": "", "description": "Filter by status" },
+                { "key": "serviceType", "value": "", "description": "Filter by service type" },
+                { "key": "year", "value": "2026", "description": "Filter by year" }
+              ]
+            },
+            "description": "Get all events for logged-in client (USER role)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Upcoming Deadlines",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/calendar/upcoming?days=30",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "calendar", "upcoming"],
+              "query": [
+                { "key": "days", "value": "30", "description": "Number of days ahead" }
+              ]
+            },
+            "description": "Get upcoming compliance deadlines (USER role)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Admin Calendar (All Clients)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/calendar/admin?status=&serviceType=&year=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "calendar", "admin"],
+              "query": [
+                { "key": "status", "value": "" },
+                { "key": "serviceType", "value": "" },
+                { "key": "year", "value": "2026" }
+              ]
+            },
+            "description": "Get ALL events for ADMIN/SUPER_ADMIN across all clients"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Client Calendar by Admin",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/calendar/client/:clientId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "calendar", "client", ":clientId"],
+              "variable": [{ "key": "clientId", "value": "", "description": "Client ID" }]
+            },
+            "description": "Get all events for a specific client (Admin view)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Event Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"completed\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/calendar/:id/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "calendar", ":id", "status"],
+              "variable": [{ "key": "id", "value": "", "description": "Event ID" }]
+            },
+            "description": "Update compliance event status (ADMIN, SUPER_ADMIN)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Phase 2.9 - Google Calendar Integration",
+      "item": [
+        {
+          "name": "Initiate Google Auth",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/google/auth",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "google", "auth"]
+            },
+            "description": "Generates Google Auth URL or syncs if already connected"
+          },
+          "response": []
+        },
+        {
+          "name": "Check Google Sync Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/google/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "google", "status"]
+            },
+            "description": "Check if user has an active Google connection"
+          },
+          "response": []
+        },
+        {
+          "name": "Disconnect Google Calendar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/google/disconnect",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "google", "disconnect"]
+            },
+            "description": "Revokes tokens and wipes synced events"
+          },
+          "response": []
+        },
+        {
+          "name": "Google Webhook Callback",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-goog-channel-id", "value": "channel-id" },
+              { "key": "x-goog-resource-id", "value": "resource-id" },
+              { "key": "x-goog-resource-state", "value": "exists" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/google/webhook",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "google", "webhook"]
+            },
+            "description": "Internal: Google Calendar push notification receiver"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Phase 2.10 - Payments (Razorpay)",
+      "item": [
+        {
+          "name": "Create Payment Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityId\": \"compliance_or_service_id\",\n  \"entityType\": \"COMPLIANCE\",\n  \"amount\": 1000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/create-order",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "create-order"]
+            },
+            "description": "Create Razorpay Order for Consultation, Compliance, or Service"
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpay_order_id\": \"order_id\",\n  \"razorpay_payment_id\": \"pay_id\",\n  \"razorpay_signature\": \"sig\",\n  \"entityId\": \"id\",\n  \"entityType\": \"COMPLIANCE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/verify-payment",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "verify-payment"]
+            },
+            "description": "Verify Razorpay payment and update entity status"
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [
